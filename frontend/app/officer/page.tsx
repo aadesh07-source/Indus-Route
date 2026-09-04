@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Container, Row, Col, Card, Button, Table } from "react-bootstrap";
 import { motion } from "motion/react";
 import { AlertTriangle, Clock, CheckCircle2, ClipboardCheck, Shield } from "lucide-react";
-import { getToken, setToken, getOfficerQueue, getQueueVersion } from "@/lib/api";
+import { getToken, setToken, getOfficerQueue, getQueueVersion, assignApplication } from "@/lib/api";
 import StatCard from "@/components/ui/StatCard";
 import AttentionTag from "@/components/ui/AttentionTag";
 import SlaRing from "@/components/ui/SlaRing";
@@ -34,6 +34,15 @@ export default function OfficerPortal() {
     try { const q = await getOfficerQueue(); setQueue(q); setAuthed(true); }
     catch { setAuthed(false); }
   }, []);
+
+  async function claimAndReview(entry: QueueEntry) {
+    try {
+      await assignApplication(entry.id);
+      setMsg("Assigned to you — opening the review console.");
+      await loadQueue();
+      setSelected({ ...entry, assigned_officer_id: "me", my_assignment: true });
+    } catch (e: any) { setErr(e.message); }
+  }
 
   useEffect(() => { setAuthed(getToken() ? null : false); }, []);
   useEffect(() => { if (authed === null) loadQueue(); }, [authed, loadQueue]);
@@ -122,6 +131,57 @@ export default function OfficerPortal() {
           </div>
         </Col>
       </Row>
+      <Card className="stat-card mb-4" style={{ borderLeft: "4px solid #ff9f0a" }}><Card.Body>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <span className="kicker" style={{ color: "#ff9f0a" }}>Incoming · auto-routed</span>
+            <h5 className="fw-bold mb-0 mt-1">New applications ({queue?.unassigned.length || 0})</h5>
+          </div>
+          {msg && <div className="alert alert-success py-1 px-2 mb-0" style={{ fontSize: ".72rem", borderLeft: "4px solid #000" }}>{msg}</div>}
+        </div>
+        {!queue?.unassigned?.length ? (
+          <div className="text-center py-4" style={{ color: "#6d6d6d" }}>
+            <CheckCircle2 size={26} strokeWidth={1.2} className="mb-2" />
+            <p style={{ fontSize: ".82rem" }}>No pending applications — when an applicant submits, it appears here instantly.</p>
+          </div>
+        ) : (
+          <div className="table-modern-wrap">
+            <table className="table-modern">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Business</th><th>Approval</th><th>Readiness</th><th>Docs</th><th>SLA</th><th className="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queue.unassigned.map(entry => (
+                  <tr key={entry.id}>
+                    <td className="mono" style={{ fontSize: ".74rem" }}>{entry.id.slice(-8)}</td>
+                    <td className="fw-bold">{entry.business_name}</td>
+                    <td><span className="mono" style={{ fontSize: ".74rem" }}>{entry.approval_code}</span></td>
+                    <td className="mono" style={{ fontSize: ".78rem" }}>{entry.readiness_score || 0}%</td>
+                    <td>
+                      {entry.documents?.length ? (
+                        <span className="mono" style={{ fontSize: ".72rem", color: "#6d6d6d" }}>
+                          {entry.documents.filter((d: any) => d.checks_passed && d.checks_passed === d.checks_total).length}/{entry.documents.length} ✓
+                        </span>
+                      ) : <span className="mono" style={{ fontSize: ".72rem", color: "#9a9a94" }}>0 docs</span>}
+                    </td>
+                    <td>
+                      <SlaRing value={entry.sla?.remaining_hours ? Math.max(0, entry.sla.remaining_hours) / 720 : 1} size={40} strokeWidth={3} color={entry.sla?.state === "breached" ? "#ff3b30" : entry.sla?.state === "at_risk" ? "#ff9f0a" : "#000"} />
+                    </td>
+                    <td className="text-end">
+                      <Button size="sm" className="btn-mono" style={{ padding: ".25rem .6rem", fontSize: ".68rem" }} onClick={() => claimAndReview(entry)}>
+                        <ClipboardCheck size={12} /> Claim & Review
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card.Body></Card>
+
       <Card className="stat-card mb-4"><Card.Body>
         <h5 className="fw-bold mb-3">Assigned to you</h5>
         {totalAssigned === 0 ? (
