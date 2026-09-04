@@ -166,12 +166,42 @@ def main():
     check("readiness 100", pre["one_click"]["readiness_100"] is True)
     check("form provenance shown", pre.get("form", {}).get("verification_code") == vcode)
 
-    # --- 1-click approve ---
+    # --- parameter-by-parameter officer review + final approve ---
+    # Final approve must be blocked until every green parameter is signed.
     status, dec = call("POST", "/officer/applications/{}/decision".format(app_id),
                        token=otok, body={
                            "action": "approve",
-                           "notes": "1-click: all parameters verified green."})
-    check("1-click approve", status == 200 and dec.get("status") == "approved")
+                           "notes": "attempt before signing parameters"})
+    check("final approve blocked until parameters signed", status == 409,
+          str(dec.get("detail", ""))[:80])
+
+    status, pre = call("GET", "/officer/applications/{}/pre-scrutiny".format(app_id),
+                       token=otok)
+    green_unsigned = [p for p in pre["parameters"]
+                      if p["state"] == "green" and not p["signed"]]
+    check("officer must sign green parameters", len(green_unsigned) > 0,
+          "{} to sign".format(len(green_unsigned)))
+
+    for p in green_unsigned:
+        status, sig = call("POST",
+                           "/officer/applications/{}/sign-parameter".format(app_id),
+                           token=otok, body={
+                               "param_key": p["param_key"],
+                               "note": "Reviewed analysis, verified."})
+        check("sign parameter: " + p["param_key"][:24],
+              status == 200 and sig.get("signed") is True)
+
+    status, pre = call("GET", "/officer/applications/{}/pre-scrutiny".format(app_id),
+                       token=otok)
+    check("all parameters signed", pre["one_click"]["all_signed"] is True,
+          "{} remaining".format(pre["one_click"].get("unsigned_count", -1)))
+
+    # --- 1-click final approve (unlocked after all parameters signed) ---
+    status, dec = call("POST", "/officer/applications/{}/decision".format(app_id),
+                       token=otok, body={
+                           "action": "approve",
+                           "notes": "All clearance parameters individually verified."})
+    check("1-click final approve", status == 200 and dec.get("status") == "approved")
 
     status, q = call("GET", "/officer/queue", token=otok)
     ids = [e["id"] for e in q.get("assigned", []) + q.get("unassigned", [])]

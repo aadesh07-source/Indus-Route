@@ -33,9 +33,10 @@ type AppRow = {
   department: string; sla_days: number; readiness_score: number;
   sla: { state: string; remaining_hours: number | null }; green_channel: boolean;
   provisional_certificate: any; documents?: any[];
+  docs_pending?: boolean; docs_passed?: number; docs_total?: number; docs_count?: number;
 };
 
-const TABS = ["Overview", "Checklist", "Applications", "Documents", "Ask AI", "Schemes"] as const;
+const TABS = ["Overview", "Checklist", "Documents", "Applications", "Ask AI", "Schemes"] as const;
 /* placeholder */
 export default function ApplicantPortal() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -310,6 +311,7 @@ function ApplicationsTab({ apps, reload, setMsg, setErr }: { apps: AppRow[]; rel
                   <th style={{ fontSize: ".72rem", letterSpacing: ".1em", textTransform: "uppercase" }}>ID</th>
                   <th style={{ fontSize: ".72rem", letterSpacing: ".1em", textTransform: "uppercase" }}>Approval</th>
                   <th style={{ fontSize: ".72rem", letterSpacing: ".1em", textTransform: "uppercase" }}>Status</th>
+                  <th style={{ fontSize: ".72rem", letterSpacing: ".1em", textTransform: "uppercase" }}>Docs</th>
                   <th style={{ fontSize: ".72rem", letterSpacing: ".1em", textTransform: "uppercase" }}>Readiness</th>
                   <th style={{ fontSize: ".72rem", letterSpacing: ".1em", textTransform: "uppercase" }}>SLA</th>
                   <th></th>
@@ -320,6 +322,17 @@ function ApplicationsTab({ apps, reload, setMsg, setErr }: { apps: AppRow[]; rel
                       <td className="mono" style={{ fontSize: ".74rem" }}>{a.id.slice(-8)}</td>
                       <td><span className="fw-bold">{a.approval_code}</span><div style={{ color: "#6d6d6d", fontSize: ".72rem" }}>{a.department}</div></td>
                       <td><Badge style={{ background: "transparent", color: "#000", border: "1.5px solid #000", borderRadius: 3, fontSize: ".64rem", fontWeight: 700, letterSpacing: ".08em" }}>{a.status.replace(/_/g, " ").toUpperCase()}</Badge></td>
+                      <td>
+                        {a.docs_pending ? (
+                          <Badge style={{ background: "transparent", color: "#ff9f0a", border: "1.5px solid #ff9f0a", borderRadius: 3, fontSize: ".64rem", fontWeight: 700, letterSpacing: ".06em" }}>
+                            VERIFY PENDING
+                          </Badge>
+                        ) : a.docs_count ? (
+                          <span className="text-success mono" style={{ fontSize: ".72rem", fontWeight: 700 }}>✓ {a.docs_passed}/{a.docs_total}</span>
+                        ) : (
+                          <span className="mono" style={{ fontSize: ".72rem", color: "#6d6d6d" }}>—</span>
+                        )}
+                      </td>
                       <td>
                         <div className="d-flex align-items-center gap-2">
                           <ProgressBar now={a.readiness_score || 0} style={{ flex: 1, height: 4, borderRadius: 0, background: "#e7e7e2" }} />

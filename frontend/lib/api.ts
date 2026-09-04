@@ -259,6 +259,17 @@ export function getQueueVersion() {
   return api.get<{ version: string }>("/officer/queue/version");
 }
 
+// ── Document specs + parameter sign-offs ──────────────────────
+export function getDocumentSpecs() {
+  return api.get<{ specs: { doc_type: string; label: string; extractable_fields: string[] }[] }>(
+    "/documents/specs");
+}
+export function signParameter(applicationId: string, paramKey: string, note = "") {
+  return api.post<{ signed: boolean; label: string; remaining_parameters: string[]; all_signed: boolean }>(
+    `/officer/applications/${applicationId}/sign-parameter`,
+    { param_key: paramKey, note });
+}
+
 export function health(): Promise<Health> {
   return api.get<Health>("/health");
 }

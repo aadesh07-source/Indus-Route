@@ -5,7 +5,7 @@ import { Container, Row, Col, Card, Button, Form, Badge, ListGroup } from "react
 import Link from "next/link";
 import { motion } from "motion/react";
 import { ArrowLeft, Upload, ScanLine, FileCheck2, CheckCircle2, XCircle } from "lucide-react";
-import { getToken, listApplications, uploadDocument, DOC_LABELS, titleCase } from "@/lib/api";
+import { getToken, listApplications, uploadDocument, DOC_LABELS, titleCase, getMyProfile, getDocumentSpecs } from "@/lib/api";
 
 type AppRow = { id: string; status: string; approval_code: string; approval_name: string; department: string; documents?: any[] };
 
@@ -20,14 +20,34 @@ export default function UploadCentre() {
   const [result, setResult] = useState<any>(null);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [specs, setSpecs] = useState<any[]>([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [declared, setDeclared] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
       const list = await listApplications();
       setApps(list.applications || []);
       setAuthed(true);
+      try { setProfile((await getMyProfile()).profile); } catch { /* optional */ }
+      setSpecs((await getDocumentSpecs()).specs || []);
     } catch { setAuthed(false); }
   }, []);
+
+  // When the document type changes, reset the declared-data form with
+  // sensible defaults pulled from the saved business profile (the applicant
+  // must confirm each field — it is then verified by the deterministic rules).
+  useEffect(() => {
+    const spec = specs.find((s: any) => s.doc_type === docType);
+    if (!spec) return;
+    const init: Record<string, string> = {};
+    for (const f of spec.extractable_fields || []) {
+      if (f === "entity_name" || f === "legal_name") init[f] = profile?.name || "";
+      if (f === "pan_number" && profile?.pan_masked) init[f] = "";
+      if (f === "aadhaar_otp_verified") init[f] = "true";
+    }
+    setDeclared(init);
+  }, [docType, specs, profile]);
 
   useEffect(() => { setAuthed(getToken() ? null : false); }, []);
   useEffect(() => { if (authed === null) load(); }, [authed, load]);
@@ -40,7 +60,7 @@ export default function UploadCentre() {
     if (!appId || !file) return;
     setBusy(true); setErr(""); setMsg(""); setResult(null);
     try {
-      const res = await uploadDocument(appId, docType, file, {});
+      const res = await uploadDocument(appId, docType, file, declared);
       setResult(res);
       setMsg("Document scanned — " + res.summary.checks_passed + "/" + res.summary.checks_total + " checks passed.");
       load();
@@ -129,12 +149,37 @@ export default function UploadCentre() {
                 onChange={(e: any) => { setFile(e.target.files?.[0] || null); setResult(null); }} />
             </div>
 
+            {specs.find((s: any) => s.doc_type === docType)?.extractable_fields?.length > 0 && (
+              <>
+                <span className="kicker mt-3">Step 3.5 · Confirm data on the document</span>
+                <div className="mt-2 mb-1" style={{ fontSize: ".74rem", color: "#6d6d6d" }}>
+                  Your scanned {DOC_LABELS[docType] || docType} will be checked against these declared values (same
+                  deterministic rules as OCR). Confirm/edit them to match the scanned file.
+                </div>
+                {specs.find((s: any) => s.doc_type === docType).extractable_fields.map((f: string) => (
+                  <Form.Group key={f} className="mb-2">
+                    <Form.Label style={{ fontSize: ".66rem", letterSpacing: ".08em", textTransform: "uppercase", fontWeight: 700, marginBottom: 2 }}>
+                      {titleCase(f.replace(/_/g, " "))}
+                    </Form.Label>
+                    <Form.Control
+                      size="sm"
+                      className="mono"
+                      value={declared[f] || ""}
+                      onChange={(e: any) => setDeclared((d: any) => ({ ...d, [f]: e.target.value }))}
+                      placeholder={f === "pan_number" ? profile?.pan_masked || "Enter PAN" : "Enter value as printed"}
+                      style={{ fontSize: ".8rem" }}
+                    />
+                  </Form.Group>
+                ))}
+              </>
+            )}
+
             <Button className="btn-mono w-100 mt-3" disabled={!appId || !file || busy} onClick={submit}>
-              {busy ? "Scanning with EasyOCR…" : <><ScanLine size={14} strokeWidth={2} /> Scan & Pre-Validate</>}
+              {busy ? "Scanning & verifying…" : <><ScanLine size={14} strokeWidth={2} /> Scan & Pre-Validate</>}
             </Button>
             <div className="principle-bar mt-3">
-              <strong>How it works:</strong> EasyOCR reads the document, deterministic rules check every
-              extracted field. The AI never decides pass/fail.
+              <strong>How it works:</strong> EasyOCR reads scanned images, deterministic rules check every
+              extracted/declared field. The AI never decides pass/fail.
             </div>
           </Card.Body></Card>
         </Col>

@@ -44,6 +44,10 @@ def _app_documents(application_id: str) -> list:
 
 def _app_view(app_row: dict, with_docs: bool = False) -> dict:
     approval = db.query_one("SELECT * FROM approvals WHERE id=?", (app_row["approval_id"],))
+    docs_stats = db.query_one(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(checks_passed),0) AS p, "
+        "COALESCE(SUM(checks_total),0) AS t FROM documents WHERE application_id=?",
+        (app_row["id"],))
     view = {
         "id": app_row["id"], "status": app_row["status"],
         "business_id": app_row["business_id"], "approval_id": app_row["approval_id"],
@@ -59,6 +63,9 @@ def _app_view(app_row: dict, with_docs: bool = False) -> dict:
         "green_channel": bool(app_row["green_channel"]),
         "provisional_certificate": db.jloads(app_row["provisional_certificate"], None),
         "sla": sla_status(app_row),
+        "docs_pending": (docs_stats["n"] == 0 or docs_stats["p"] < docs_stats["t"]),
+        "docs_passed": docs_stats["p"], "docs_total": docs_stats["t"],
+        "docs_count": docs_stats["n"],
         "created_at": app_row["created_at"],
     }
     if with_docs:
@@ -96,16 +103,27 @@ def my_applications(user: dict = Depends(get_current_user)):
     if user["role"] in ("officer", "admin"):
         rows = db.query(
             "SELECT a.*, ap.name AS approval_name, ap.code AS approval_code, "
-            "ap.department, ap.sla_days FROM applications a "
-            "JOIN approvals ap ON a.approval_id=ap.id ORDER BY a.created_at DESC")
+            "ap.department, ap.sla_days, "
+            "(SELECT COUNT(*) FROM documents d WHERE d.application_id=a.id) AS docs_count, "
+            "(SELECT COALESCE(SUM(d.checks_passed),0) FROM documents d WHERE d.application_id=a.id) AS docs_passed, "
+            "(SELECT COALESCE(SUM(d.checks_total),0) FROM documents d WHERE d.application_id=a.id) AS docs_total "
+            "FROM applications a JOIN approvals ap ON a.approval_id=ap.id ORDER BY a.created_at DESC")
     else:
         profile = get_own_profile(user)
         rows = db.query(
             "SELECT a.*, ap.name AS approval_name, ap.code AS approval_code, "
-            "ap.department, ap.sla_days FROM applications a "
-            "JOIN approvals ap ON a.approval_id=ap.id WHERE a.business_id=? "
-            "ORDER BY a.created_at DESC", (profile["id"],))
-    return {"applications": [dict(r) for r in rows]}
+            "ap.department, ap.sla_days, "
+            "(SELECT COUNT(*) FROM documents d WHERE d.application_id=a.id) AS docs_count, "
+            "(SELECT COALESCE(SUM(d.checks_passed),0) FROM documents d WHERE d.application_id=a.id) AS docs_passed, "
+            "(SELECT COALESCE(SUM(d.checks_total),0) FROM documents d WHERE d.application_id=a.id) AS docs_total "
+            "FROM applications a JOIN approvals ap ON a.approval_id=ap.id "
+            "WHERE a.business_id=? ORDER BY a.created_at DESC", (profile["id"],))
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["docs_pending"] = (r["docs_count"] == 0 or r["docs_passed"] < r["docs_total"])
+        out.append(d)
+    return {"applications": out}
 
 
 @router.get("/applications/{application_id}")

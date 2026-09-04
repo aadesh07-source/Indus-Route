@@ -274,6 +274,18 @@ CREATE TABLE IF NOT EXISTS generated_forms (
     submitted_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS parameter_signoffs (
+    id TEXT PRIMARY KEY,
+    application_id TEXT NOT NULL REFERENCES applications(id),
+    officer_id TEXT NOT NULL,
+    param_key TEXT NOT NULL,
+    param_label TEXT DEFAULT '',
+    deterministic_state TEXT DEFAULT '',
+    note TEXT DEFAULT '',
+    created_at TEXT NOT NULL,
+    UNIQUE(application_id, param_key)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

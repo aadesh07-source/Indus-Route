@@ -99,3 +99,8 @@ class DigiLockerApplyRequest(BaseModel):
     pan: str = Field(default="", max_length=20)
     gst: str = Field(default="", max_length=20)
     authorized_person: str = Field(default="", max_length=120)
+
+
+class SignParameterRequest(BaseModel):
+    param_key: str = Field(min_length=1, max_length=80)
+    note: str = Field(default="", max_length=500)

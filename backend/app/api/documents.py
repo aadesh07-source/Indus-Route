@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 
 from .. import db, config
 from ..core import ocr_service
+from ..core import rule_engine
 from ..core.rule_engine import get_doc_spec
 from .deps import get_current_user, get_own_profile, load_profile_dict, audit
 
@@ -110,6 +111,22 @@ async def upload_document(
                            "validator — regex, hash comparison, expiry or "
                            "presence. No AI was involved in pass/fail."),
     }
+
+
+@router.get("/documents/specs")
+def document_specs(user: dict = Depends(get_current_user)):
+    """Field declarations required per document type (drives the upload UI)."""
+    specs = []
+    for doc_type in sorted(rule_engine.list_doc_types()):
+        spec = rule_engine.get_doc_spec(doc_type)
+        specs.append({
+            "doc_type": doc_type,
+            "label": spec.get("label", doc_type),
+            "extractable_fields": spec.get("extractable_fields", []),
+        })
+    return {"specs": specs,
+            "note": ("Declared fields are validated by the same deterministic "
+                     "rule-table checks as OCR-extracted ones.")}
 
 
 @router.get("/documents/{document_id}")

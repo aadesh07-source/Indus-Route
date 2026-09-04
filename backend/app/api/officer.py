@@ -2,7 +2,7 @@
 AI-drafted clarifications (edit-before-send), inspection scheduling."""
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..models.schemas import DecisionRequest, InspectionRequest
+from ..models.schemas import DecisionRequest, InspectionRequest, SignParameterRequest
 from .. import db, config
 from ..core.ai_service import draft_clarification, pre_scrutiny_summary
 from ..core.readiness import sla_status
@@ -138,6 +138,80 @@ def pre_scrutiny(application_id: str,
     if open_clr:
         all_green = False
 
+    # ---- Per-parameter clearance analysis + officer sign-off state ----
+    from ..core import digilocker
+    profile_row = db.query_one(
+        "SELECT owner_id, pan_hash, gst_hash FROM business_profiles WHERE id=?",
+        (app_row["business_id"],))
+    kyc = digilocker.latest_verified(profile_row["owner_id"]) if profile_row else {}
+    signoffs = db.query(
+        "SELECT param_key, officer_id, created_at FROM parameter_signoffs "
+        "WHERE application_id=?", (application_id,))
+    signed_map = {s["param_key"]: s for s in signoffs}
+    parameters = []
+
+    def add_param(key, label, state, analysis):
+        s = signed_map.get(key)
+        parameters.append({
+            "param_key": key, "label": label,
+            "state": state, "analysis": analysis,
+            "signed": bool(s),
+            "signed_by": s["officer_id"] if s else None,
+            "signed_at": s["created_at"] if s else None,
+        })
+
+    kyc_ok = kyc.get("kyc_status") in ("verified", "applied")
+    add_param(
+        "identity_kyc", "Applicant identity & e-KYC",
+        "green" if kyc_ok else "attention",
+        ("DigiLocker e-KYC {} (consent ref {}).".format(
+            kyc.get("kyc_status"), kyc.get("digilocker_ref", "-")))
+        if kyc else
+        "No DigiLocker e-KYC on file — identity is self-declared only.")
+
+    for m in matrix:
+        if m["state"] == "green":
+            analysis = ("All {} deterministic checks passed ({}/{}).".format(
+                m["checks_total"], m["checks_passed"], m["checks_total"]))
+        elif m["state"] == "failing":
+            analysis = ("Failing checks: {}/{} passed — see document matrix."
+                        .format(m["checks_passed"], m["checks_total"]))
+        else:
+            analysis = "Document has not been uploaded yet."
+        add_param("doc:{}".format(m["doc_type"]),
+                  "Document: {}".format(m["doc_type"].replace("_", " ")),
+                  m["state"], analysis)
+
+    # PAN<->GSTIN cross-link (from the uploaded GST certificate's checks)
+    pan_link = None
+    for d in ctx["documents"]:
+        if d.get("type") == "gst_certificate":
+            for f in d.get("validation_flags", []):
+                if f.get("check_id") == "gstin_pan_link":
+                    pan_link = f
+    if pan_link is not None:
+        add_param("pan_gstin_link", "PAN <-> GSTIN cross-verification",
+                  "green" if pan_link.get("passed") else "attention",
+                  pan_link.get("reason", ""))
+    else:
+        add_param("pan_gstin_link", "PAN <-> GSTIN cross-verification",
+                  "na", "No GST certificate required for this approval type.")
+
+    readiness_100 = (app_row["readiness_score"] or 0) >= 100
+    add_param("readiness_100", "Submission readiness 100%",
+              "green" if readiness_100 else "attention",
+              "Rubric-based readiness score: {}/100.".format(
+                  app_row["readiness_score"] or 0))
+
+    # 'na' parameters are auto-satisfied; 'green' ones need an officer tick;
+    # 'attention' ones cannot be signed until the underlying issue is fixed.
+    for p in parameters:
+        if p["state"] == "na":
+            p["signed"] = True
+            p["auto"] = True
+    unsigned = [p["label"] for p in parameters
+                if p["state"] == "green" and not p["signed"]]
+
     # Auto-form provenance (AI/autofill generated, hash-bound).
     form = db.query_one(
         "SELECT filename, verification_code, source, sha256, generated_at, "
@@ -154,14 +228,61 @@ def pre_scrutiny(application_id: str,
         },
         "one_click": {
             "all_green": all_green,
+            "all_signed": len(unsigned) == 0 and all_green,
+            "unsigned_count": len(unsigned),
+            "unsigned": unsigned,
             "required_matrix": matrix,
-            "readiness_100": (app_row["readiness_score"] or 0) >= 100,
-            "note": ("All deterministic parameters satisfied — officer retains "
-                     "full authority to approve, clarify or reject."),
+            "readiness_100": readiness_100,
+            "note": ("Approve parameters one by one; Final Approve unlocks only "
+                     "when every parameter carries the officer's tick."),
         },
+        "parameters": parameters,
         "form": dict(form) if form else None,
         "principle": "AI explains; rules and the officer decide.",
     }
+
+
+@router.post("/applications/{application_id}/sign-parameter")
+def sign_parameter(application_id: str, body: SignParameterRequest,
+                   user: dict = Depends(require_roles("officer", "admin"))):
+    """Officer approves ONE clearance parameter after reviewing its
+    deterministic + AI analysis. Final approval needs every green parameter
+    signed."""
+    _app_or_404(application_id)
+    pre = pre_scrutiny(application_id, user)  # full analysis (RBAC enforced)
+    match = [p for p in pre["parameters"]
+             if p["param_key"] == body.param_key.strip()]
+    if not match:
+        raise HTTPException(status_code=404, detail="Unknown parameter.")
+    param = match[0]
+    if param["state"] == "na":
+        return {"param_key": body.param_key, "signed": True,
+                "label": param["label"],
+                "note": "Parameter not applicable — auto-satisfied."}
+    if param["state"] != "green":
+        raise HTTPException(
+            status_code=409,
+            detail="Parameter is not green (state: '{}') — the underlying "
+                   "document/data must pass first.".format(param["state"]))
+    db.execute(
+        "INSERT INTO parameter_signoffs (id, application_id, officer_id, param_key, "
+        "param_label, deterministic_state, note, created_at) VALUES (?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(application_id, param_key) DO UPDATE SET "
+        "officer_id=excluded.officer_id, param_label=excluded.param_label, "
+        "deterministic_state=excluded.deterministic_state, note=excluded.note, "
+        "created_at=excluded.created_at",
+        (db.new_id("par"), application_id, user["id"], body.param_key.strip(),
+         param["label"], "green", body.note.strip(), db._now()))
+    audit("parameter_signoff", application_id, user, "sign_parameter",
+          "'{}' signed as verified.".format(param["label"]),
+          {"param_key": body.param_key})
+    remaining = [p["label"] for p in pre["parameters"]
+                 if p["state"] == "green" and not p["signed"]
+                 and p["param_key"] != body.param_key.strip()]
+    return {"param_key": body.param_key, "signed": True,
+            "label": param["label"],
+            "remaining_parameters": remaining,
+            "all_signed": len(remaining) == 0}
 
 
 @router.post("/applications/{application_id}/draft-clarification")
@@ -239,6 +360,15 @@ def decision(application_id: str, body: DecisionRequest,
             raise HTTPException(
                 status_code=409,
                 detail="An open clarification request must be resolved first.")
+        # Parameter gate: every green parameter must be individually signed.
+        pre = pre_scrutiny(application_id, user)
+        unsigned = [p["label"] for p in pre["parameters"]
+                    if p["state"] == "green" and not p["signed"]]
+        if unsigned:
+            raise HTTPException(
+                status_code=409,
+                detail="Approve each parameter first — {} remaining: {}".format(
+                    len(unsigned), "; ".join(unsigned[:5])))
         new_status = "approved"
     else:
         new_status = "rejected"

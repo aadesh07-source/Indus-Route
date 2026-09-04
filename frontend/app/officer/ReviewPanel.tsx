@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Offcanvas, Card, Button, Form, ListGroup } from "react-bootstrap";
 import { CheckCircle2, XCircle, Send, Calendar, Eye, UserCheck, Shield, Zap, FileDown, FileCheck2 } from "lucide-react";
-import { assignApplication, getPreScrutiny, officerDecision, scheduleInspection, getToken, downloadFormPdf } from "@/lib/api";
+import { assignApplication, getPreScrutiny, officerDecision, scheduleInspection, getToken, downloadFormPdf, signParameter } from "@/lib/api";
 
 export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg, onErr }: any) {
   const [prescrutiny, setPrescrutiny] = useState<any>(null);
@@ -52,6 +52,16 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
     catch (e: any) { onErr(e.message); }
   }
 
+  async function signParam(paramKey: string) {
+    if (!selected) return;
+    onErr(""); onMsg("");
+    try {
+      const res = await signParameter(selected.id, paramKey);
+      onMsg(`Parameter approved — ${res.label}. ${res.remaining_parameters.length} parameter(s) remaining.`);
+      setPrescrutiny(await getPreScrutiny(selected.id));
+    } catch (e: any) { onErr(e.message); }
+  }
+
   if (!selected) return null;
 
   return (
@@ -94,25 +104,53 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
           </Card.Body></Card>
         </>)}
         {prescrutiny?.one_click && (
-          <Card style={{ background: "#111", borderColor: prescrutiny.one_click.all_green ? "#0a0" : "#333" }} className="mb-3"><Card.Body>
+          <Card style={{ background: "#111", borderColor: prescrutiny.one_click.all_signed ? "#0a0" : "#333" }} className="mb-3"><Card.Body>
             <div className="d-flex justify-content-between align-items-center">
-              <h5 className="fw-bold mb-0">Statutory checklist</h5>
-              {prescrutiny.one_click.all_green
-                ? <span className="text-success fw-bold" style={{ fontSize: ".8rem" }}>ALL PARAMETERS GREEN</span>
-                : <span style={{ color: "#ff9f0a", fontSize: ".8rem" }}>PENDING ITEMS</span>}
+              <h5 className="fw-bold mb-0">Clearance parameters</h5>
+              <span style={{ fontSize: ".78rem" }}>
+                {prescrutiny.one_click.all_signed
+                  ? <span className="text-success fw-bold">ALL APPROVED ✓</span>
+                  : <span style={{ color: "#ff9f0a" }}>{prescrutiny.one_click.unsigned_count} pending</span>}
+              </span>
             </div>
-            {prescrutiny.one_click.required_matrix?.map((m: any) => (
-              <div key={m.doc_type} className="d-flex justify-content-between py-1" style={{ borderBottom: "1px solid #333", fontSize: ".78rem" }}>
-                <span>{m.doc_type.replace(/_/g, " ")}</span>
-                {m.state === "green" ? <span className="text-success mono">✓ {m.checks_passed}/{m.checks_total}</span>
-                  : m.state === "failing" ? <span className="text-danger mono">✗ {m.checks_passed}/{m.checks_total}</span>
-                  : <span style={{ color: "#ff9f0a" }}>not uploaded</span>}
+            <div className="mt-2 mb-3" style={{ background: "#0a0a0a", borderRadius: 4, padding: "6px 10px", fontSize: ".72rem", color: "#c9c9c4" }}>
+              Review each clearance below — the AI/deterministic analysis is shown beside
+              every parameter. Approve them one by one; Final Approve unlocks at the end.
+            </div>
+            {prescrutiny.parameters?.map((p: any) => (
+              <div key={p.param_key} className="py-2" style={{ borderBottom: "1px solid #222", fontSize: ".78rem" }}>
+                <div className="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div className="fw-bold">{p.label}</div>
+                    <div style={{ color: "#8f8f8f", fontSize: ".72rem", marginTop: 2 }}>{p.analysis}</div>
+                  </div>
+                  {p.signed ? (
+                    <span className="text-success fw-bold flex-shrink-0" style={{ fontSize: ".72rem" }}>
+                      {p.auto ? "NOT APPLICABLE" : "APPROVED ✓"}
+                    </span>
+                  ) : p.state === "green" ? (
+                    <Button size="sm" className="btn-mono flex-shrink-0"
+                      style={{ padding: ".2rem .6rem", fontSize: ".66rem" }}
+                      onClick={() => signParam(p.param_key)}>
+                      <CheckCircle2 size={11} /> Approve
+                    </Button>
+                  ) : (
+                    <span style={{ color: p.state === "attention" ? "#ff9f0a" : "#ff3b30", fontSize: ".68rem" }} className="flex-shrink-0">
+                      {p.state.toUpperCase()}
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
-            <div className="principle-bar mt-2"><strong>Rules decided readiness ({prescrutiny.one_click.readiness_100 ? "100/100" : "incomplete"})</strong> — approval remains the officer's call.</div>
-            {prescrutiny.one_click.all_green && (
-              <Button className="btn-mono w-100 mt-2" style={{ background: "#0a0", borderColor: "#0a0", color: "#000" }} onClick={() => act("approve")}>
-                <Zap size={14} /> 1-Click Instant Approve
+            <div className="principle-bar mt-2"><strong>Rules decided readiness ({prescrutiny.one_click.readiness_100 ? "100/100" : "incomplete"})</strong> — every green parameter needs your individual sign-off.</div>
+            {prescrutiny.one_click.all_signed ? (
+              <Button className="btn-mono w-100 mt-2" style={{ background: "#0a0", borderColor: "#0a0", color: "#000" }}
+                onClick={() => act("approve")}>
+                <Zap size={14} /> 1-Click Final Approve (all parameters verified)
+              </Button>
+            ) : (
+              <Button className="btn-mono w-100 mt-2" disabled>
+                <Shield size={14} /> Approve all parameters to unlock Final Approve
               </Button>
             )}
           </Card.Body></Card>
