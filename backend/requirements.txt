@@ -1,0 +1,9 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+python-multipart>=0.0.9
+apscheduler>=3.10
+cryptography>=42.0
+# Optional (auto-detected, gracefully degraded if absent):
+easyocr            # real OCR; demo regex extraction is used when absent
+# google-generativeai  # not required: Gemini called via REST (urllib)

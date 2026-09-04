@@ -1,0 +1,92 @@
+{
+  "sector": "pharma",
+  "label": "Pharmaceuticals & Life Sciences",
+  "approvals": [
+    {
+      "id": "ph_udyam",
+      "code": "UDYAM",
+      "name": "Udyam (MSME) Registration",
+      "department": "Ministry of MSME",
+      "description": "National MSME registration enabling scheme eligibility.",
+      "sla_days": 3,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["pan_card", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "ph_drug_lic",
+      "code": "DRUG-LIC",
+      "name": "Drug Manufacturing / Sale License",
+      "department": "Food & Drug Administration, Maharashtra",
+      "description": "Mandatory license for manufacturing or selling pharmaceutical products.",
+      "sla_days": 15,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["pan_card", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "ph_factory_plan",
+      "code": "FACTORY-PLAN",
+      "name": "Factory Plan Approval",
+      "department": "Directorate of Industrial Safety & Health",
+      "description": "Approval of factory building plans and layout for pharma units.",
+      "sla_days": 21,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["factory_layout", "lease_deed", "pan_card"]
+    },
+    {
+      "id": "ph_fire_noc",
+      "code": "FIRE-NOC",
+      "name": "Fire Safety NOC",
+      "department": "Maharashtra Fire Services",
+      "description": "No-objection certificate for fire safety compliance.",
+      "sla_days": 14,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["factory_layout", "self_declaration"]
+    },
+    {
+      "id": "ph_mpcb_cte",
+      "code": "MPCB-CTE",
+      "name": "MPCB Consent to Establish",
+      "department": "Maharashtra Pollution Control Board",
+      "description": "Consent required before establishing a pharmaceutical unit.",
+      "sla_days": 30,
+      "parallel_group": "C",
+      "dependency_ids": ["FACTORY-PLAN"],
+      "green_channel_eligible": false,
+      "required_documents": ["lease_deed", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "ph_bmw_auth",
+      "code": "BMW-AUTH",
+      "name": "Biomedical Waste Authorization",
+      "department": "Maharashtra Pollution Control Board",
+      "description": "Authorization for handling and disposal of biomedical / lab waste.",
+      "sla_days": 30,
+      "parallel_group": "C",
+      "dependency_ids": ["MPCB-CTE"],
+      "green_channel_eligible": false,
+      "condition": {"field": "employee_count", "op": "gte", "value": 10},
+      "required_documents": ["lease_deed", "self_declaration"]
+    },
+    {
+      "id": "ph_shop_est",
+      "code": "SHOP-EST",
+      "name": "Shop & Establishment Registration",
+      "department": "Labour Department",
+      "description": "Required for establishments with commercial activity.",
+      "sla_days": 10,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "condition": {"field": "employee_count", "op": "gte", "value": 5},
+      "required_documents": ["pan_card", "self_declaration"]
+    }
+  ]
+}

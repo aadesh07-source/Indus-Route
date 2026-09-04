@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data (local SQLite demo store + uploads + logs)
+backend/data/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.local
+*.local
+
+# Local runtime logs (root data/ dir)
+data/
+*.log
+
+# Misc
+.DS_Store
+Thumbs.db

@@ -1,0 +1,93 @@
+{
+  "sector": "chemicals",
+  "label": "Chemicals & Petrochemicals",
+  "approvals": [
+    {
+      "id": "ch_udyam",
+      "code": "UDYAM",
+      "name": "Udyam (MSME) Registration",
+      "department": "Ministry of MSME",
+      "description": "National MSME registration enabling scheme eligibility.",
+      "sla_days": 3,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["pan_card", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "ch_factory_plan",
+      "code": "FACTORY-PLAN",
+      "name": "Factory Plan Approval",
+      "department": "Directorate of Industrial Safety & Health",
+      "description": "Approval of factory building plans and layout for chemical units.",
+      "sla_days": 21,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["factory_layout", "lease_deed", "pan_card"]
+    },
+    {
+      "id": "ch_fire_noc",
+      "code": "FIRE-NOC",
+      "name": "Fire Safety NOC",
+      "department": "Maharashtra Fire Services",
+      "description": "No-objection certificate for fire safety compliance.",
+      "sla_days": 14,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["factory_layout", "self_declaration"]
+    },
+    {
+      "id": "ch_mpcb_cte",
+      "code": "MPCB-CTE",
+      "name": "MPCB Consent to Establish",
+      "department": "Maharashtra Pollution Control Board",
+      "description": "Consent required before establishing a chemical manufacturing unit.",
+      "sla_days": 30,
+      "parallel_group": "C",
+      "dependency_ids": ["FACTORY-PLAN"],
+      "green_channel_eligible": false,
+      "required_documents": ["lease_deed", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "ch_mpcb_hw",
+      "code": "MPCB-HW",
+      "name": "Hazardous Waste Authorization",
+      "department": "Maharashtra Pollution Control Board",
+      "description": "Authorization for collection, storage and disposal of hazardous waste.",
+      "sla_days": 45,
+      "parallel_group": "C",
+      "dependency_ids": ["MPCB-CTE"],
+      "green_channel_eligible": false,
+      "condition": {"field": "employee_count", "op": "gte", "value": 10},
+      "required_documents": ["lease_deed", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "ch_peso",
+      "code": "PESO-LIC",
+      "name": "PESO Storage License",
+      "department": "Petroleum & Explosives Safety Organisation",
+      "description": "License for storage of petroleum, solvents and flammable materials.",
+      "sla_days": 40,
+      "parallel_group": "C",
+      "dependency_ids": ["FACTORY-PLAN"],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 2000000},
+      "required_documents": ["factory_layout", "lease_deed", "self_declaration"]
+    },
+    {
+      "id": "ch_labour_license",
+      "code": "LABOUR-LIC",
+      "name": "Contract Labour License",
+      "department": "Labour Department",
+      "description": "License for engaging contract labour in manufacturing.",
+      "sla_days": 20,
+      "parallel_group": "C",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "employee_count", "op": "gte", "value": 20},
+      "required_documents": ["pan_card", "lease_deed", "self_declaration"]
+    }
+  ]
+}

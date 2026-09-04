@@ -1,0 +1,475 @@
+// ============================================================
+// INDUS ROUTE — global stylesheet
+// Imports the custom theme (variable overrides) then the
+// Bootstrap 5.3 source, then layers the platform's own UI language.
+// ============================================================
+@import "./custom-theme";
+@import "bootstrap/scss/bootstrap";
+
+// ── Base ─────────────────────────────────────────────────────
+html { scroll-behavior: smooth; }
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: $black; color: $white; }
+.surface-black ::selection { background: $white; color: $black; }
+
+a { text-underline-offset: 3px; }
+
+// Monospace data / metrics (readiness scores, IDs, SLAs)
+.mono {
+  font-family: $font-family-monospace;
+  font-size: 0.85em;
+  letter-spacing: -0.02em;
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: $ink-muted;
+}
+.surface-black .kicker { color: $ink-on-dark; }
+
+// Oversized display hierarchy — beyond Bootstrap's defaults
+.display-6, .display-7, .display-8 { font-weight: $font-weight-bolder; letter-spacing: -0.035em; line-height: 0.95; }
+.display-6 { font-size: clamp(2.5rem, 6vw, 3.5rem); }
+.display-7 { font-size: clamp(2.1rem, 5vw, 3rem); }
+.display-8 { font-size: clamp(1.8rem, 4.5vw, 2.5rem); }
+
+// ── Buttons: .btn-mono — flat, fast, snappy invert ──────────
+.btn-mono {
+  --btn-bg: #000;
+  --btn-fg: #fff;
+  --btn-hover-bg: #fff;
+  --btn-hover-fg: #000;
+  border: $btn-border-width solid var(--btn-bg);
+  border-radius: 4px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.85rem 1.9rem;
+  transition: none;
+  &:hover, &:focus {
+    color: var(--btn-hover-fg);
+    background: var(--btn-hover-bg);
+    border-color: var(--btn-bg);
+    box-shadow: none;
+  }
+  &:active { transform: translateY(1px); }
+  &.btn-light-invert {
+    --btn-bg: #fff;
+    --btn-fg: #000;
+    --btn-hover-bg: #000;
+    --btn-hover-fg: #fff;
+  }
+  &.btn-outline-mono {
+    --btn-bg: transparent;
+    --btn-fg: #000;
+    --btn-hover-bg: #000;
+    --btn-hover-fg: #fff;
+  }
+  &.btn-outline-mono-light {
+    --btn-bg: transparent;
+    --btn-fg: #fff;
+    --btn-hover-bg: #fff;
+    --btn-hover-fg: #000;
+    border-color: #fff;
+  }
+  &.btn-approve {
+    --btn-bg: #000;
+    --btn-fg: #fff;
+    --btn-hover-bg: #000;
+    --btn-hover-fg: #fff;
+    border-color: #000;
+    box-shadow: inset 0 -3px 0 #fff;
+    &:hover { box-shadow: inset 0 -3px 0 #fff; transform: translateY(-1px); }
+  }
+  &.btn-reject {
+    --btn-bg: #fff;
+    --btn-fg: #000;
+    --btn-hover-bg: #fff;
+    --btn-hover-fg: #000;
+    border-color: #ff3b30;
+    &:hover { border-width: 2px; }
+  }
+  &:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+}
+
+// ── Black surface mode — intentional layout contrast ─────────
+.surface-black {
+  --bs-body-color: #fff;
+  --bs-secondary-color: #c9c9c4;
+  background: $black;
+  color: #fff;
+  a { color: #fff; }
+  .kicker { color: #8f8f8f; }
+  .text-black { color: #000 !important; }
+  .text-muted, .muted { color: #8f8f8f !important; }
+  .card, .card-header, .card-footer {
+    background: #000;
+    color: #fff;
+    border-color: #3a3a3a;
+  }
+  .table {
+    --bs-table-bg: #000;
+    --bs-table-color: #fff;
+    --bs-table-border-color: #3a3a3a;
+    --bs-table-striped-bg: #0d0d0d;
+    --bs-table-hover-bg: #141414;
+    color: #fff;
+  }
+  .form-control, .form-select {
+    background-color: #000;
+    color: #fff;
+    border-color: #4a4a4a;
+  }
+  hr { border-color: #3a3a3a; opacity: 1; }
+}
+
+// ── Ink emphasis (formerly the green glow — now pure contrast) ─
+.glow-green {
+  color: $electric-green;
+  text-shadow: none;
+  filter: none;
+}
+.glow-soft {
+  filter: none;
+}
+// ── Navbar ───────────────────────────────────────────────────
+.ir-nav {
+  position: sticky; top: 0; z-index: 1030;
+  background: #fff; border-bottom: $border-width solid #000;
+  .navbar-brand {
+    font-weight: 800; letter-spacing: -0.02em; font-size: 1.12rem;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .nav-link {
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    &.active { text-decoration: underline; text-underline-offset: 6px; }
+  }
+  .nav-cta { border: $border-width solid #000; border-radius: 4px; padding: 0.45rem 1rem; }
+}
+.ir-nav--dark {
+  background: #000; border-bottom: 1px solid #3a3a3a;
+  .navbar-brand { color: #fff; }
+  .nav-link { color: #fff; }
+}
+
+// ── Footer ───────────────────────────────────────────────────
+.ir-footer {
+  background: $black; color: #7d7d7a; font-size: 0.8rem;
+  a { color: #fff; }
+  .footer-line { border-top: 1px solid #2a2a2a; }
+  .govt-mark { letter-spacing: 0.3em; font-size: 0.65rem; text-transform: uppercase; color: #555; }
+}
+
+// ── Hero ─────────────────────────────────────────────────────
+.hero {
+  position: relative;
+  min-height: 92vh;
+  background: $black;
+  color: #fff;
+  overflow: hidden;
+  display: flex; align-items: center;
+  .hero-canvas { position: absolute; inset: 0; }
+  .hero-content { position: relative; z-index: 2; }
+  .hero-title {
+    font-size: clamp(3.2rem, 9vw, 7.5rem);
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    line-height: 0.9;
+    margin: 1.2rem 0;
+  }
+  .hero-sub {
+    color: #b9b9b4; font-size: clamp(1rem, 1.6vw, 1.2rem); max-width: 34rem;
+    font-weight: 450; letter-spacing: -0.01em;
+  }
+  .hero-stats {
+    border-top: 1px solid #2a2a2a; margin-top: 2.5rem; padding-top: 1.5rem;
+    .stat-num {
+      font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em;
+      color: #fff; text-shadow: none;
+    }
+    .stat-lbl { color: #8f8f8f; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .22em; }
+  }
+  .scroll-hint {
+    position: absolute; bottom: 1.6rem; left: 50%; transform: translateX(-50%);
+    color: #8f8f8f; font-size: 0.62rem; letter-spacing: 0.4em; text-transform: uppercase;
+    animation: ir-bob 2.4s ease-in-out infinite;
+  }
+}
+@keyframes ir-bob { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 6px); } }
+
+// ── Persona cards (landing) ──────────────────────────────────
+.persona-card {
+  border-radius: $border-radius;
+  transition: background-color .15s ease, color .15s ease, transform .15s ease;
+  .icon-frame {
+    width: 46px; height: 46px; border: $border-width solid currentColor;
+    border-radius: $border-radius-sm; display: inline-flex; align-items: center; justify-content: center;
+  }
+  &:hover { transform: translateY(-3px); background: #fff; color: #000; box-shadow: 0 0 0 1.5px #000 inset; }
+}
+
+// ── Process timeline (landing) ───────────────────────────────
+.timeline {
+  position: relative;
+  .timeline-track {
+    position: absolute; top: 34px; left: 4%; right: 4%; height: 2px; background: #e5e5e1;
+    .timeline-fill {
+      position: absolute; left: 0; top: 0; height: 100%; width: 100%;
+      background: #000; transform-origin: left center; transform: scaleX(0);
+    }
+  }
+  .timeline-node {
+    position: relative; z-index: 1; text-align: center;
+    .node-dot {
+      width: 64px; height: 64px; margin: 0 auto; border-radius: 50%;
+      border: $border-width solid #000; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      transition: background-color .15s ease, color .15s ease;
+    }
+    h5 { margin-top: 1rem; font-weight: 800; letter-spacing: -0.02em; }
+    p { color: $ink-muted; font-size: .8rem; }
+    &:hover .node-dot { background: #000; color: #fff; }
+  }
+}
+// ── Stat strip / metric tiles ────────────────────────────────
+.stat-card {
+  .stat-icon { width: 40px; height: 40px; border: $border-width solid #000; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; }
+  .stat-num { font-size: 2.1rem; font-weight: 850; letter-spacing: -0.04em; line-height: 1; }
+  .stat-lbl { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: $ink-muted; }
+  .spark-wrap { display: flex; align-items: flex-end; justify-content: flex-end; }
+}
+.backlit-tile {
+  background: #000; color: #fff; border: 1px solid #3a3a3a; border-radius: $border-radius;
+  position: relative; overflow: hidden;
+  .tile-num { font-size: clamp(2.2rem, 4vw, 3rem); font-weight: 850; letter-spacing: -0.045em; line-height: 1; }
+  .tile-lbl { color: #8f8f8f; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
+  .tile-glow { position: absolute; width: 120px; height: 120px; border-radius: 50%; right: -40px; top: -40px;
+    background: radial-gradient(circle at center, rgba(255,255,255,.14), transparent 70%); pointer-events: none; }
+}
+
+// ── Gauge chart ──────────────────────────────────────────────
+.gauge-wrap {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  .gauge-num {
+    position: absolute; font-size: clamp(2.4rem, 5vw, 3.6rem);
+    font-weight: 850; letter-spacing: -0.05em; line-height: 1;
+  }
+}
+.gauge-track { stroke: #e5e5e1; fill: none; }
+.gauge-fill { stroke: $black; fill: none; filter: none; }
+
+// ── Readiness backlit panel ──────────────────────────────────
+.readiness-panel {
+  background: #000; color: #fff; border-radius: $border-radius;
+  border: 1px solid #3a3a3a; position: relative; overflow: hidden;
+  .rp-glow { position: absolute; inset: 0; background:
+    radial-gradient(600px 260px at 20% 0%, rgba(255,255,255,.06), transparent 60%);
+    pointer-events: none; }
+  .deduction-line {
+    display: flex; justify-content: space-between; gap: 1rem;
+    padding: 0.55rem 0.1rem;
+    border-bottom: 1px dashed #2a2a2a;
+    font-family: $font-family-monospace; font-size: 0.78rem; color: #b4b4ae;
+    &:last-child { border-bottom: none; }
+    .deduct { color: $pure-red; white-space: nowrap; }
+  }
+}
+// ── SLA ring + progress ──────────────────────────────────────
+.sla-ring { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.sla-ring-num {
+  position: absolute; font-family: $font-family-monospace; font-size: 0.7rem;
+  text-align: center; line-height: 1.15; color: #6d6d6d;
+}
+.progress.thin-bar { height: 3px; }
+.progress.thin-bar .progress-bar { background: $electric-green; }
+.progress.thin-bar.sla-amber .progress-bar { background: $amber; }
+.progress.thin-bar.sla-red .progress-bar { background: $pure-red; }
+
+// ── Attention tag (text only, no fills) ──────────────────────
+.attention-tag {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase;
+  &.att-low { color: $black; }
+  &.att-medium { color: $amber; }
+  &.att-high { color: $pure-red; }
+}
+.surface-black .attention-tag.att-low { color: #fff; }
+
+// ── React Flow DAG restyle ───────────────────────────────────
+.dag-shell { width: 100%; height: 420px; border: $border-width solid #000; border-radius: $border-radius; overflow: hidden; }
+.react-flow__attribution { display: none; }
+.react-flow__node { font-family: $font-family-sans-serif; }
+.react-flow__edge-path { stroke-width: 1.6px; }
+.dag-node {
+  min-width: 168px; background: #fff; border: $border-width solid #000;
+  border-radius: 5px; padding: 0.55rem 0.75rem; font-size: 0.74rem;
+  box-shadow: none;
+  .dag-code { font-family: $font-family-monospace; font-size: 0.66rem; color: $ink-muted; letter-spacing: .04em; }
+  .dag-status { font-size: 0.6rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; margin-top: .25rem; }
+  &.node-approved { border-color: $black; box-shadow: none;
+    .dag-status { color: $black; text-shadow: none; } }
+  &.node-flagged { border-color: $pure-red;
+    .dag-status { color: $pure-red; } }
+}
+
+// ── Dropzone ─────────────────────────────────────────────────
+.dropzone {
+  border: 2px dashed #000; border-radius: $border-radius; background: #fff;
+  padding: 3.2rem 1.5rem; text-align: center; cursor: pointer;
+  transition: transform .12s ease, background-color .12s ease;
+  &:hover { background: #fafaf8; }
+}
+
+// ── Checklist rows (upload results) ──────────────────────────
+.check-row {
+  display: flex; gap: 0.8rem; align-items: flex-start;
+  padding: 0.7rem 0.25rem; border-bottom: 1px solid #ecece8;
+  .check-icon { width: 22px; height: 22px; border-radius: 3px; flex: 0 0 22px; display: inline-flex; align-items: center; justify-content: center; border: $border-width solid #000; font-size: .7rem; }
+  &.ok .check-icon { background: #000; color: #fff; border-color: #000; }
+  &.fail .check-icon { background: #fff; color: $pure-red; border-color: $pure-red; }
+  .check-reason { font-size: 0.76rem; color: $ink-muted; font-family: $font-family-monospace; }
+}
+
+// ── Heatmap ──────────────────────────────────────────────────
+.sla-heat {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  .heat-cell {
+    aspect-ratio: 1; border-radius: 4px; cursor: default; position: relative;
+    background: #1a1a1a; border: 1px solid #2e2e2e;
+    &.sev0 { background: #0f0f0f; }
+    &.sev1 { background: #2e2e2e; box-shadow: none; }
+    &.sev2 { background: #4a4a4a; }
+    &.sev3 { background: #6d4a00; }
+    &.sev4 { background: #7a1f12; box-shadow: inset 0 0 10px rgba(255,59,48,.25); }
+    .heat-day { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: $font-family-monospace; font-size: .6rem; color: rgba(255,255,255,.75); }
+  }
+}
+
+// ── Offcanvas detail ─────────────────────────────────────────
+.offcanvas { border-left: $border-width solid #000; }
+.ai-summary-card {
+  background: #000; color: #fff; border-radius: 16px; border: 1px solid #3a3a3a; position: relative;
+  p { color: #d6d6d2; font-weight: 600; }
+  h5, .kicker { letter-spacing: 0.02em; }
+  pre { color: #cfcfca; font-size: 0.76rem; white-space: pre-wrap; font-family: $font-family-monospace; }
+}
+.field-compare {
+  list-style: none; padding: 0; margin: 0;
+  li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid #ecece8; font-size: 0.78rem;
+    .doc-v { font-family: $font-family-monospace; }
+    .ok-v { color: #000; font-weight: 700; }
+    .bad-v { color: $pure-red; font-weight: 700; text-decoration: line-through; } }
+}
+
+// ── Nav tabs (portals) ───────────────────────────────────────
+.ir-tabs { display: flex; gap: 2px; border-bottom: 2px solid #000; flex-wrap: wrap;
+  button {
+    border: none; background: none; padding: 0.7rem 1.1rem; font-size: 0.76rem; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: $ink-muted; border-bottom: 2px solid transparent; margin: 0;
+    &.active { color: #000; border-bottom-color: #000; }
+    &:hover { color: #000; }
+  }
+}
+
+// ── Principle banner ─────────────────────────────────────────
+.principle-bar {
+  border-left: 4px solid $electric-green; background: #f7f7f5; border-radius: 10px;
+  padding: 0.9rem 1.2rem; font-size: 0.82rem; font-weight: 600;
+  strong { letter-spacing: 0.02em; }
+}
+
+// ── Chart polish (admin, on black) ───────────────────────────
+.chart-shell { .recharts-cartesian-axis-tick text { fill: #8f8f8f !important; font-size: 11px; font-family: $font-family-monospace; }
+  .recharts-cartesian-grid-horizontal line { stroke: #2a2a2a; stroke-dasharray: 2 4; }
+  .recharts-tooltip-cursor { fill: rgba(255,255,255,.05); } }
+.tooltip-ink {
+  background: #fff; color: #000; border: $border-width solid #000; border-radius: 4px;
+  padding: 0.55rem 0.8rem; font-size: 0.75rem; font-family: $font-family-monospace; box-shadow: none;
+  .tt-k { color: $ink-muted; }
+}
+
+// ── Feature strip (landing) ──────────────────────────────────
+.feature-row { display: flex; gap: 1.4rem; align-items: flex-start;
+  .feature-num { font-size: 0.8rem; font-weight: 800; font-family: $font-family-monospace; color: $electric-green; text-shadow: none; } }
+
+// ── Auth pages ───────────────────────────────────────────────
+.auth-shell {
+  min-height: 86vh; display: flex; align-items: center; justify-content: center;
+  background-image: linear-gradient(#f2f2ef 1px, transparent 1px), linear-gradient(90deg, #f2f2ef 1px, transparent 1px);
+  background-size: 40px 40px;
+  .auth-card { width: 100%; max-width: 460px; }
+}
+.auth-side-note { font-size: .72rem; color: $ink-muted; font-family: $font-family-monospace; }
+
+.dz-drop {
+  border: $border-width dashed #000;
+  border-radius: 10px;
+  padding: 1.4rem 1rem;
+  text-align: center;
+  transition: transform .12s ease, background-color .12s ease;
+  &.dz-dragging { transform: scale(1.02); background: #f3f3ef; }
+  .dz-icon { width: 56px; height: 56px; margin: 0 auto 1rem; border: $border-width solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+}
+
+// ── Modern rounded tables — soft-cornered data ledgers ───────
+.table-modern-wrap {
+  border: $border-width solid #000;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.table-modern {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+  thead th {
+    background: #000;
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: .8rem 1rem;
+    border: none;
+    border-bottom: $border-width solid #000;
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: .8rem 1rem;
+    border: none;
+    border-bottom: 1px solid #ecece8;
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #f6f6f4; }
+}
+
+// ── Hero scrim — keeps hero copy bold over the mesh canvas ───
+.hero-scrim {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.88) 0%, rgba(0,0,0,.72) 44%, rgba(0,0,0,.15) 78%, rgba(0,0,0,0) 100%),
+    linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 62%, rgba(0,0,0,.65) 100%);
+}
+
+// ── Chart panel (white surface, rounded) ─────────────────────
+.chart-card {
+  border: $border-width solid #000;
+  border-radius: 10px;
+  background: #fff;
+  padding: 1.1rem 1.2rem;
+  h6 { font-weight: 800; letter-spacing: .02em; margin-bottom: .25rem; }
+  .chart-note { font-size: .72rem; color: $ink-muted; letter-spacing: .06em; }
+}
