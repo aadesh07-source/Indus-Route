@@ -70,13 +70,48 @@ backend/
   app/core/readiness.py     rubric-based explainable readiness score
   app/core/green_channel.py Green Channel extension (constrained, audited)
   app/core/ai_service.py    Gemini (optional) — summarize/draft/RAG only
+  app/core/digilocker.py    DigiLocker/Aadhaar e-KYC adapter (sandbox mode;
+                            full Aadhaar never stored — last-4 ref only)
+  app/core/form_pdf.py      stdlib-only Unified Application Form PDF writer
   app/core/scheduler.py     SLA monitor (APScheduler, thread fallback)
   app/core/pii.py           PAN/GST encrypt+hash+mask (Aadhaar never stored)
   app/notifications/sms_gateway.py  Termux webhook client (optional)
-  app/rules/*.json       food_processing, textiles, document_checks
-  tests/smoke_test.py    end-to-end verification
+  app/rules/*.json       food_processing, textiles, chemicals, pharma,
+                         automotive, document_checks
+  tests/smoke_test.py    end-to-end verification (36 checks)
+  tests/autofill_test.py auto-form pipeline verification (27 checks)
 infra/supabase/           production schema.sql + rls-policies.sql
 ```
+
+## Auto-Form Pipeline (DigiLocker → PDF → instant officer routing → 1-click approve)
+
+The applicant-to-approval flow can run end-to-end with zero manual form entry:
+
+1. **DigiLocker e-KYC** — applicant enters their Aadhaar number, receives an
+   OTP (sandbox shows it in-app; production sends it via the SMS gateway),
+   and the verified identity is merged into the business profile. The full
+   Aadhaar number is used transiently and **never stored** (last-4 + consent
+   reference only). With `SIH_DIGILOCKER_CLIENT_ID`/`_SECRET` configured the
+   same interface calls the real API Setu endpoints.
+2. **Auto-generated Unified Application Form (PDF)** — a stdlib-only PDF
+   writer compiles the e-KYC data, business profile, the deterministic
+   sector-clearance checklist and the document pre-validation matrix into an
+   official-looking form with a SHA-256 integrity hash, a verification code
+   (check: `GET /forms/verify/{code}`) and a hash-pattern verification block.
+3. **Instant dispatch** — `POST /applications/{id}/submit-form` moves the
+   application into the officer queue and notifies every officer immediately;
+   the officer portal polls a lightweight queue-version endpoint (4s) and
+   refreshes the moment an application lands (Supabase Realtime/WebSockets
+   replace this in production).
+4. **AI pre-scrutiny + all-green matrix** — the officer review console shows
+   the auto-form provenance (verification code, e-KYC binding), the
+   deterministic per-document checklist, and a computed `all_green` state.
+5. **1-Click Instant Approve** — when every statutory parameter is green the
+   officer can approve in one click. The system never auto-approves a final
+   decision: the button is merely enabled by deterministic checks; the human
+   officer still decides (and can always clarify or reject instead).
+
+Try it end-to-end: `python backend/tests/autofill_test.py http://127.0.0.1:8000`
 
 ## Key design decisions
 

@@ -246,6 +246,34 @@ CREATE TABLE IF NOT EXISTS notifications (
     sent_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS kyc_consents (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    aadhaar_last4 TEXT DEFAULT '',
+    digilocker_ref TEXT DEFAULT '',
+    otp_hash TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending_otp',
+    verified_data TEXT DEFAULT '{}',
+    kyc_source TEXT DEFAULT 'digilocker-sandbox',
+    attempts INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    verified_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS generated_forms (
+    id TEXT PRIMARY KEY,
+    application_id TEXT NOT NULL REFERENCES applications(id),
+    business_id TEXT NOT NULL,
+    filename TEXT DEFAULT '',
+    file_ref TEXT DEFAULT '',
+    sha256 TEXT DEFAULT '',
+    verification_code TEXT DEFAULT '',
+    source TEXT DEFAULT 'kyc-autofill',
+    checklist_snapshot TEXT DEFAULT '{}',
+    generated_at TEXT NOT NULL,
+    submitted_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

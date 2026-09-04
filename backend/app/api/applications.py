@@ -1,12 +1,14 @@
 """Application endpoints: create, readiness, submit (incl. Green Channel),
-clarifications, grievances, scheme recommendations, RAG Q&A, notifications."""
+auto-generated PDF forms, clarifications, grievances, schemes, Q&A, notifications."""
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 
 from ..models.schemas import (CreateApplicationRequest, RespondClarificationRequest,
                               GrievanceRequest)
-from .. import db
+from .. import db, config
 from ..core.readiness import compute_readiness, sla_deadline_for, sla_status
-from ..core import green_channel
+from ..core import green_channel, digilocker, form_pdf
+from ..core.rule_engine import evaluate_profile
 from ..core.ai_service import answer_regulatory_question
 from .deps import (get_current_user, get_own_profile, load_profile_dict,
                    audit, notify)
@@ -145,25 +147,22 @@ def _approval_dict(approval: dict) -> dict:
     return d
 
 
-@router.post("/applications/{application_id}/submit")
-def submit_application(application_id: str, user: dict = Depends(get_current_user)):
-    app_row = _load_application(application_id)
-    _assert_can_view(app_row, user)
-    if app_row["status"] not in ("draft", "clarification_pending"):
-        raise HTTPException(
-            status_code=409,
-            detail="Application cannot be submitted from status '{}'.".format(
-                app_row["status"]))
-
+def _perform_submit(app_row: dict, user: dict, source: str) -> dict:
+    """Shared submission path (manual submit and auto-form submit)."""
     profile = db.query_one("SELECT * FROM business_profiles WHERE id=?",
                            (app_row["business_id"],))
     approval = _approval_dict(db.query_one(
         "SELECT * FROM approvals WHERE id=?", (app_row["approval_id"],)))
-    documents = _app_documents(application_id)
+    documents = _app_documents(app_row["id"])
     readiness = compute_readiness(load_profile_dict(profile), approval, documents)
 
     now = db._now()
     deadline = sla_deadline_for(approval["sla_days"])
+
+    # Persist readiness on every submission path (incl. Green Channel).
+    db.execute(
+        "UPDATE applications SET readiness_score=?, readiness_breakdown=? WHERE id=?",
+        (readiness["score"], db.jdumps(readiness["breakdown"]), app_row["id"]))
 
     # Green Channel extension: deterministic auto-issuance attempt.
     gc = green_channel.attempt_green_channel(dict(app_row), approval, documents)
@@ -180,6 +179,7 @@ def submit_application(application_id: str, user: dict = Depends(get_current_use
             "sla_deadline=?, readiness_score=?, readiness_breakdown=? WHERE id=?",
             (now, deadline, readiness["score"], db.jdumps(readiness["breakdown"]),
              app_row["id"]))
+        # Instant dispatch: every officer is notified immediately.
         for off in db.query("SELECT id FROM users WHERE role='officer'"):
             notify(off["id"], "New Application Submitted",
                    "{} ({}) is awaiting assignment.".format(
@@ -189,12 +189,105 @@ def submit_application(application_id: str, user: dict = Depends(get_current_use
                    deadline[:10]), application_id=app_row["id"])
 
     audit("application", app_row["id"], user, "submit",
-          "Submitted. Readiness {}%. Green channel: {}".format(
-              readiness["score"], "issued" if gc["issued"] else gc["reason"]),
-          {"green_channel_issued": gc["issued"]})
+          "Submitted via {}. Readiness {}%. Green channel: {}".format(
+              source, readiness["score"], "issued" if gc["issued"] else gc["reason"]),
+          {"green_channel_issued": gc["issued"], "source": source})
     app_row = _load_application(app_row["id"])
     return {"application": _app_view(app_row), "readiness": readiness,
             "green_channel": gc}
+
+
+@router.post("/applications/{application_id}/submit")
+def submit_application(application_id: str, user: dict = Depends(get_current_user)):
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    if app_row["status"] not in ("draft", "clarification_pending"):
+        raise HTTPException(
+            status_code=409,
+            detail="Application cannot be submitted from status '{}'.".format(
+                app_row["status"]))
+    return _perform_submit(app_row, user, "manual submission")
+
+
+
+@router.post("/applications/{application_id}/generate-form")
+def generate_form(application_id: str, user: dict = Depends(get_current_user)):
+    """Auto-generate the Unified Application Form PDF from e-KYC data,
+    the business profile, the rule-engine checklist and document validation."""
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    if app_row["status"] not in ("draft", "clarification_pending"):
+        raise HTTPException(status_code=409,
+                            detail="Form can only be generated while in draft.")
+    profile = db.query_one("SELECT * FROM business_profiles WHERE id=?",
+                           (app_row["business_id"],))
+    approval = _approval_dict(db.query_one(
+        "SELECT * FROM approvals WHERE id=?", (app_row["approval_id"],)))
+    documents = _app_documents(application_id)
+    checklist = evaluate_profile(load_profile_dict(profile))
+    kyc = digilocker.latest_verified(profile["owner_id"])
+    applicant = db.query_one("SELECT name FROM users WHERE id=?",
+                             (profile["owner_id"],))
+
+    identity = form_pdf.new_form_identity(application_id, app_row["business_id"])
+    pdf_bytes = form_pdf.build_application_pdf({
+        "form_no": identity["form_no"],
+        "generated_at": identity["generated_at"],
+        "verification_code": identity["verification_code"],
+        "sha256": identity["sha256"],
+        "profile": profile, "approval": approval, "checklist": checklist,
+        "documents": documents, "kyc": kyc,
+        "applicant_name": applicant["name"] if applicant else "",
+    })
+
+    form_id = db.new_id("frm")
+    forms_dir = config.DATA_DIR / "forms"
+    forms_dir.mkdir(parents=True, exist_ok=True)
+    filename = "UAF-{}.pdf".format(identity["verification_code"])
+    file_path = forms_dir / "{}.pdf".format(form_id)
+    file_path.write_bytes(pdf_bytes)
+
+    db.execute(
+        "INSERT INTO generated_forms (id, application_id, business_id, filename, "
+        "file_ref, sha256, verification_code, source, checklist_snapshot, "
+        "generated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (form_id, application_id, app_row["business_id"], filename,
+         str(file_path), identity["sha256"], identity["verification_code"],
+         "kyc-autofill" if kyc else "profile-autofill",
+         db.jdumps({"sector": checklist.get("sector"),
+                    "approvals": [a["code"] for a in checklist.get("approvals", [])],
+                    "known": checklist.get("known")}),
+         identity["generated_at"]))
+    audit("generated_form", form_id, user, "generate",
+          "Unified Application Form PDF generated ({} source).".format(
+              "e-KYC autofill" if kyc else "profile autofill"))
+    return {
+        "form_id": form_id, "filename": filename,
+        "verification_code": identity["verification_code"],
+        "sha256": identity["sha256"],
+        "kyc_bound": bool(kyc),
+        "download_url": "/api/applications/{}/form.pdf".format(application_id),
+        "size_bytes": len(pdf_bytes),
+    }
+
+
+@router.get("/applications/{application_id}/form.pdf")
+def download_form(application_id: str, user: dict = Depends(get_current_user)):
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    form = db.query_one(
+        "SELECT * FROM generated_forms WHERE application_id=? "
+        "ORDER BY generated_at DESC LIMIT 1", (application_id,))
+    if form is None:
+        raise HTTPException(status_code=404,
+                            detail="No generated form for this application yet.")
+    try:
+        data = (config.DATA_DIR / "forms" / "{}.pdf".format(form["id"])).read_bytes()
+    except OSError:
+        raise HTTPException(status_code=410, detail="Stored form file is missing.")
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition":
+                             "attachment; filename={}".format(form["filename"])})
 
 
 @router.post("/applications/{application_id}/clarifications/{request_id}/respond")
@@ -288,3 +381,46 @@ def my_notifications(user: dict = Depends(get_current_user)):
     return {"notifications": rows}
 
 
+
+
+@router.post("/applications/{application_id}/submit-form")
+def submit_with_form(application_id: str, user: dict = Depends(get_current_user)):
+    """Submit using the auto-generated form -> instant dispatch to officers."""
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    if app_row["status"] not in ("draft", "clarification_pending"):
+        raise HTTPException(
+            status_code=409,
+            detail="Application cannot be submitted from status '{}'.".format(
+                app_row["status"]))
+    form = db.query_one(
+        "SELECT id, verification_code FROM generated_forms WHERE application_id=? "
+        "ORDER BY generated_at DESC LIMIT 1", (application_id,))
+    if form is None:
+        raise HTTPException(status_code=422,
+                            detail="Generate the Unified Application Form first.")
+    db.execute("UPDATE generated_forms SET submitted_at=? WHERE id=?",
+               (db._now(), form["id"]))
+    result = _perform_submit(app_row, user,
+                             "auto-generated form {}".format(form["verification_code"]))
+    result["form_verification_code"] = form["verification_code"]
+    result["dispatched"] = ("Instant dispatch: application is now visible in "
+                            "the officer portal.")
+    return result
+
+
+@router.get("/forms/verify/{verification_code}")
+def verify_form(verification_code: str):
+    """Public tamper-evidence check (QR / verification code). No PII returned."""
+    form = db.query_one(
+        "SELECT * FROM generated_forms WHERE verification_code=?",
+        (verification_code.strip().upper(),))
+    if form is None:
+        return {"valid": False,
+                "note": "No form found for this verification code."}
+    return {"valid": True, "form_no": form["filename"].replace(".pdf", ""),
+            "generated_at": form["generated_at"],
+            "submitted": bool(form["submitted_at"]),
+            "sha256_prefix": form["sha256"][:16],
+            "note": ("Cryptographically bound to its generation time; any edit "
+                     "to the PDF invalidates the recorded hash.")}

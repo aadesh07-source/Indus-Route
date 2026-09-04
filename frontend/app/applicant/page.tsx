@@ -7,11 +7,14 @@ import { motion } from "motion/react";
 import {
   FileCheck2, RefreshCw, Sparkles, Send, CheckCircle2, Clock,
   Workflow, ScrollText, Inbox, PlusCircle, Upload,
+  FileDown, BadgeCheck, Zap, Fingerprint,
 } from "lucide-react";
 import {
   getToken, setToken, getMyProfile, saveProfile,
   listApplications, createApplication, submitApplication,
   raiseGrievance, getSchemeRecommendations, askRegulatoryQuestion, getReadiness,
+  startDigiLocker, verifyDigiLocker, applyDigiLocker, digiLockerStatus,
+  generateForm, submitWithForm, downloadFormPdf,
 } from "@/lib/api";
 import NextDynamic from "next/dynamic";
 import SlaRing from "@/components/ui/SlaRing";
@@ -106,6 +109,7 @@ export default function ApplicantPortal() {
       {msg && <div className="alert alert-success py-2" style={{ borderLeft: "4px solid #000" }}>{msg}</div>}
       {err && <div className="alert alert-danger py-2" style={{ borderLeft: "4px solid #ff3b30" }}>{err}</div>}
       {tab === "Overview" && <OverviewTab apps={apps} checklist={checklist} avgReadiness={avgReadiness} approved={approved} pending={pending} renewals={renewals} />}
+      {tab === "Overview" && <KycCard />}
       {tab === "Checklist" && <ChecklistTab checklist={checklist} aiSummary={aiSummary} />}
       {tab === "Applications" && <ApplicationsTab apps={apps} reload={loadAll} setMsg={setMsg} setErr={setErr} />}
       {tab === "Documents" && <DocumentsTab />}
@@ -258,6 +262,7 @@ function ChecklistTab({ checklist, aiSummary }: { checklist: Checklist | null; a
 }
 function ApplicationsTab({ apps, reload, setMsg, setErr }: { apps: AppRow[]; reload: () => void; setMsg: (s: string) => void; setErr: (s: string) => void }) {
   const [appId, setAppId] = useState("");
+  const [busyId, setBusyId] = useState("");
   async function apply(checklistApprovalId: string) {
     setErr(""); setMsg("");
     try { await createApplication(checklistApprovalId); setMsg("Application created."); reload(); }
@@ -266,6 +271,29 @@ function ApplicationsTab({ apps, reload, setMsg, setErr }: { apps: AppRow[]; rel
   async function submit(id: string) {
     setErr(""); setMsg("");
     try { await submitApplication(id); setMsg("Submitted for review."); reload(); }
+    catch (e: any) { setErr(e.message); }
+  }
+  async function genForm(id: string) {
+    setBusyId(id); setErr(""); setMsg("");
+    try {
+      const meta = await generateForm(id);
+      await downloadFormPdf(id);
+      setMsg(`Unified Application Form generated and downloaded (verify code ${meta.verification_code}${meta.kyc_bound ? ", e-KYC bound" : ""}).`);
+    } catch (e: any) { setErr(e.message); }
+    finally { setBusyId(""); }
+  }
+  async function submitForm(id: string) {
+    setBusyId(id); setErr(""); setMsg("");
+    try {
+      const res = await submitWithForm(id);
+      setMsg(`Form ${res.form_verification_code} submitted — instantly dispatched to the officer portal.`);
+      reload();
+    } catch (e: any) { setErr(e.message); }
+    finally { setBusyId(""); }
+  }
+  async function dlForm(id: string) {
+    setErr(""); setMsg("");
+    try { await downloadFormPdf(id); setMsg("Form PDF downloaded."); }
     catch (e: any) { setErr(e.message); }
   }
   return (
@@ -300,7 +328,12 @@ function ApplicationsTab({ apps, reload, setMsg, setErr }: { apps: AppRow[]; rel
                       </td>
                       <td><SlaRing value={a.sla?.remaining_hours ? Math.max(0, a.sla.remaining_hours) / (a.sla_days * 24) : 1} size={38} strokeWidth={3} color={a.sla?.state === "breached" ? "#ff3b30" : a.sla?.state === "at_risk" ? "#ff9f0a" : "#000"} /></td>
                       <td className="text-end">
-                        {a.status === "draft" && <><Button size="sm" className="btn-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }} onClick={() => submit(a.id)}>Submit</Button>{" "}<Link href={`/applicant/upload?app=${a.id}`}><Button size="sm" className="btn-mono btn-outline-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }}>Docs</Button></Link></>}
+                        {a.status === "draft" && <span className="d-inline-flex gap-1 flex-wrap">
+                          <Button size="sm" className="btn-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }} disabled={busyId === a.id} onClick={() => genForm(a.id)}><FileDown size={12} /> {busyId === a.id ? "…" : "Auto-Form PDF"}</Button>
+                          <Button size="sm" className="btn-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }} disabled={busyId === a.id} onClick={() => submitForm(a.id)}><Zap size={12} /> Submit Form</Button>
+                          <Link href={`/applicant/upload?app=${a.id}`}><Button size="sm" className="btn-mono btn-outline-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }}>Docs</Button></Link>
+                        </span>}
+                        {a.status !== "draft" && <Button size="sm" className="btn-mono btn-outline-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }} onClick={() => dlForm(a.id)}><FileDown size={12} /> Form PDF</Button>}
                       </td>
                     </tr>
                   ))}
@@ -406,5 +439,90 @@ function SchemesTab() {
         </Card.Body></Card>
             </Col>
     </Row>
+  );
+}
+
+function KycCard() {
+  const [status, setStatus] = useState<any>(null);
+  const [step, setStep] = useState<"idle" | "otp" | "consent">("idle");
+  const [aadhaar, setAadhaar] = useState("");
+  const [otp, setOtp] = useState("");
+  const [consentId, setConsentId] = useState("");
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
+  const [masked, setMasked] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => { digiLockerStatus().then(setStatus).catch(() => {}); }, []);
+
+  async function start() {
+    setBusy(true); setErr(""); setMsg("");
+    try {
+      const res = await startDigiLocker(aadhaar.replace(/\s/g, ""));
+      setConsentId(res.consent_id); setMasked(res.aadhaar_masked);
+      setDemoOtp(res.demo_otp); setStep("otp");
+      setMsg("OTP sent via DigiLocker gateway" + (res.demo_otp ? " (sandbox demo OTP shown below)." : "."));
+    } catch (e: any) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function verify() {
+    setBusy(true); setErr(""); setMsg("");
+    try {
+      const res = await verifyDigiLocker(consentId, otp);
+      setMsg(res.note || "Identity verified."); setStep("consent");
+    } catch (e: any) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function apply() {
+    setBusy(true); setErr(""); setMsg("");
+    try {
+      const res = await applyDigiLocker(consentId, {});
+      setMsg("e-KYC applied to your profile — name/PAN/GSTIN will be cross-checked automatically.");
+      setStep("idle"); setOtp(""); setDemoOtp(null);
+      const s = await digiLockerStatus(); setStatus(s);
+    } catch (e: any) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Card className="stat-card"><Card.Body>
+      <span className="kicker">DigiLocker e-KYC</span>
+      <h5 className="fw-bold mb-2 mt-1">
+        {status?.kyc_verified ? <><BadgeCheck size={18} strokeWidth={2} className="me-1" /> Identity verified</> : <><Fingerprint size={18} strokeWidth={2} className="me-1" /> Auto-fill via DigiLocker</>}
+      </h5>
+      {status?.kyc_verified ? (
+        <>
+          <div style={{ fontSize: ".8rem" }} className="mb-1"><strong>{status.identity?.name}</strong></div>
+          <div style={{ fontSize: ".76rem", color: "#6d6d6d" }} className="mb-1">Aadhaar: {status.identity?.aadhaar_masked} · Ref: {status.identity?.digilocker_ref}</div>
+          <div style={{ fontSize: ".76rem", color: "#6d6d6d" }} className="mb-2">Source: {status.identity?.kyc_source}</div>
+          <div className="principle-bar"><strong>Verified identity</strong> — generated forms are bound to this e-KYC; full Aadhaar number is never stored.</div>
+        </>
+      ) : step === "idle" ? (
+        <>
+          <p style={{ fontSize: ".8rem", color: "#6d6d6d" }}>Authenticate with Aadhaar OTP to auto-fill your application form from verified government records — no manual typing, no typos.</p>
+          <Form.Control className="mono mb-2" placeholder="12-digit Aadhaar number" value={aadhaar} onChange={(e: any) => setAadhaar(e.target.value)} maxLength={14} />
+          <Button className="btn-mono w-100" disabled={aadhaar.replace(/\s/g, "").length !== 12 || busy} onClick={start}>
+            <Fingerprint size={14} strokeWidth={2} /> {busy ? "Sending OTP…" : "Start e-KYC"}
+          </Button>
+        </>
+      ) : step === "otp" ? (
+        <>
+          <p style={{ fontSize: ".8rem", color: "#6d6d6d" }}>Enter the OTP sent for {masked}.</p>
+          {demoOtp && <div className="alert alert-warning py-2" style={{ fontSize: ".74rem" }}>Sandbox demo OTP: <strong className="mono">{demoOtp}</strong></div>}
+          <Form.Control className="mono mb-2" placeholder="6-digit OTP" value={otp} onChange={(e: any) => setOtp(e.target.value)} maxLength={6} />
+          <Button className="btn-mono w-100" disabled={otp.length < 4 || busy} onClick={verify}>{busy ? "Verifying…" : "Verify OTP"}</Button>
+        </>
+      ) : (
+        <>
+          <p style={{ fontSize: ".8rem", color: "#6d6d6d" }}>Verified. Apply this identity to your business profile now.</p>
+          <Button className="btn-mono w-100" disabled={busy} onClick={apply}><BadgeCheck size={14} strokeWidth={2} /> {busy ? "Applying…" : "Apply to my profile"}</Button>
+        </>
+      )}
+      {msg && <div className="alert alert-success py-2 mt-2" style={{ fontSize: ".74rem", borderLeft: "4px solid #000" }}>{msg}</div>}
+      {err && <div className="alert alert-danger py-2 mt-2" style={{ fontSize: ".74rem", borderLeft: "4px solid #ff3b30" }}>{err}</div>}
+    </Card.Body></Card>
   );
 }

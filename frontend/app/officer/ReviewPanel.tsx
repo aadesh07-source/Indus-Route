@@ -2,8 +2,8 @@
 "use client";
 import { useState } from "react";
 import { Offcanvas, Card, Button, Form, ListGroup } from "react-bootstrap";
-import { CheckCircle2, XCircle, Send, Calendar, Eye, UserCheck, Shield } from "lucide-react";
-import { assignApplication, getPreScrutiny, officerDecision, scheduleInspection, getToken } from "@/lib/api";
+import { CheckCircle2, XCircle, Send, Calendar, Eye, UserCheck, Shield, Zap, FileDown, FileCheck2 } from "lucide-react";
+import { assignApplication, getPreScrutiny, officerDecision, scheduleInspection, getToken, downloadFormPdf } from "@/lib/api";
 
 export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg, onErr }: any) {
   const [prescrutiny, setPrescrutiny] = useState<any>(null);
@@ -62,6 +62,21 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
       </Offcanvas.Title></Offcanvas.Header>
       <Offcanvas.Body>
         {!selected.assigned_officer_id && <Button className="btn-mono mb-3" onClick={assign}><UserCheck size={14} /> Assign to me</Button>}
+        {prescrutiny?.form && (
+          <Card className="ai-summary-card mb-3"><Card.Body>
+            <span className="kicker" style={{ color: "#8f8f8f" }}>Auto-Generated Form</span>
+            <div className="d-flex justify-content-between align-items-center mt-1">
+              <div style={{ fontSize: ".78rem", color: "#c9c9c4" }}>
+                <strong>{prescrutiny.form.verification_code}</strong> · {prescrutiny.form.source}
+                {prescrutiny.form.submitted_at ? " · submitted" : ""}
+              </div>
+              <Button size="sm" className="btn-mono btn-outline-mono" onClick={() => downloadFormPdf(selected.id).catch((e: any) => onErr(e.message))}>
+                <FileDown size={12} /> View PDF
+              </Button>
+            </div>
+            <div className="principle-bar mt-2"><strong>Machine-filled</strong> — e-KYC data + rule engine; hash-tamper-evident.</div>
+          </Card.Body></Card>
+        )}
         {prescrutiny && (<>
           <Card className="ai-summary-card mb-3"><Card.Body>
             <span className="kicker" style={{ color: "#8f8f8f" }}>AI Pre-Scrutiny</span>
@@ -78,6 +93,30 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
             ))}
           </Card.Body></Card>
         </>)}
+        {prescrutiny?.one_click && (
+          <Card style={{ background: "#111", borderColor: prescrutiny.one_click.all_green ? "#0a0" : "#333" }} className="mb-3"><Card.Body>
+            <div className="d-flex justify-content-between align-items-center">
+              <h5 className="fw-bold mb-0">Statutory checklist</h5>
+              {prescrutiny.one_click.all_green
+                ? <span className="text-success fw-bold" style={{ fontSize: ".8rem" }}>ALL PARAMETERS GREEN</span>
+                : <span style={{ color: "#ff9f0a", fontSize: ".8rem" }}>PENDING ITEMS</span>}
+            </div>
+            {prescrutiny.one_click.required_matrix?.map((m: any) => (
+              <div key={m.doc_type} className="d-flex justify-content-between py-1" style={{ borderBottom: "1px solid #333", fontSize: ".78rem" }}>
+                <span>{m.doc_type.replace(/_/g, " ")}</span>
+                {m.state === "green" ? <span className="text-success mono">✓ {m.checks_passed}/{m.checks_total}</span>
+                  : m.state === "failing" ? <span className="text-danger mono">✗ {m.checks_passed}/{m.checks_total}</span>
+                  : <span style={{ color: "#ff9f0a" }}>not uploaded</span>}
+              </div>
+            ))}
+            <div className="principle-bar mt-2"><strong>Rules decided readiness ({prescrutiny.one_click.readiness_100 ? "100/100" : "incomplete"})</strong> — approval remains the officer's call.</div>
+            {prescrutiny.one_click.all_green && (
+              <Button className="btn-mono w-100 mt-2" style={{ background: "#0a0", borderColor: "#0a0", color: "#000" }} onClick={() => act("approve")}>
+                <Zap size={14} /> 1-Click Instant Approve
+              </Button>
+            )}
+          </Card.Body></Card>
+        )}
         <div className="d-flex flex-wrap gap-2 mt-3 mb-4">
           <Button className="btn-mono" onClick={() => act("verify")}><CheckCircle2 size={14} /> Verify</Button>
           <Button className="btn-mono" onClick={() => act("approve")}><Shield size={14} /> Approve</Button>

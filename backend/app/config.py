@@ -77,6 +77,10 @@ GEMINI_API_KEY: str = _env("GEMINI_API_KEY", "")
 GEMINI_MODEL: str = _env("GEMINI_MODEL", "gemini-2.0-flash")
 GEMINI_TIMEOUT_SECONDS: int = _env("GEMINI_TIMEOUT_SECONDS", 15, int)
 
+# --- DigiLocker / API Setu (optional; sandbox mode when absent) ---
+DIGILOCKER_CLIENT_ID: str = _env("SIH_DIGILOCKER_CLIENT_ID", "")
+DIGILOCKER_CLIENT_SECRET: str = _env("SIH_DIGILOCKER_CLIENT_SECRET", "")
+
 # --- SMS gateway (optional) ---
 SMS_WEBHOOK_URL: str = _env("SIH_SMS_WEBHOOK_URL", "")
 SMS_WEBHOOK_TOKEN: str = _env("SIH_SMS_WEBHOOK_TOKEN", "")

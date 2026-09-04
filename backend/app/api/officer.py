@@ -68,6 +68,17 @@ def officer_queue(user: dict = Depends(require_roles("officer", "admin"))):
                      "attention is not a risk score.")}
 
 
+@router.get("/queue/version")
+def queue_version(user: dict = Depends(require_roles("officer", "admin"))):
+    """Lightweight change signal for near-real-time polling (no WebSockets
+    needed in the SQLite demo; Supabase Realtime replaces this in prod)."""
+    row = db.query_one(
+        "SELECT COUNT(*) AS n, COALESCE(MAX(created_at),'') AS latest "
+        "FROM applications WHERE status IN "
+        "('submitted','under_review','clarification_pending')")
+    return {"version": "{}:{}".format(row["n"], row["latest"])}
+
+
 @router.post("/applications/{application_id}/assign")
 def assign_to_me(application_id: str,
                  user: dict = Depends(require_roles("officer", "admin"))):
@@ -94,6 +105,45 @@ def pre_scrutiny(application_id: str,
     app_row = _app_or_404(application_id)
     ctx = _app_ctx(app_row)
     summary = pre_scrutiny_summary(ctx, ctx["documents"])
+
+    # Deterministic one-click-readiness matrix (mirrors Green Channel logic
+    # but for ANY approval type: every required doc present + 100% checks).
+    approval = db.query_one("SELECT * FROM approvals WHERE id=?",
+                            (app_row["approval_id"],))
+    required = db.jloads(approval["required_documents"], []) if approval else []
+    docs_by_type = {}
+    for d in ctx["documents"]:
+        docs_by_type.setdefault(d.get("type"), []).append(d)
+    matrix, all_green = [], True
+    for doc_type in required:
+        candidates = docs_by_type.get(doc_type, [])
+        if not candidates:
+            matrix.append({"doc_type": doc_type, "present": False,
+                           "passed": None, "state": "missing"})
+            all_green = False
+            continue
+        best = max(candidates, key=lambda d: (d.get("checks_passed", 0),
+                                              d.get("uploaded_at", "")))
+        passed = (best.get("checks_total", 0) > 0
+                  and best.get("checks_passed", 0) == best.get("checks_total", 0))
+        matrix.append({"doc_type": doc_type, "present": True,
+                       "checks_passed": best.get("checks_passed", 0),
+                       "checks_total": best.get("checks_total", 0),
+                       "state": "green" if passed else "failing"})
+        if not passed:
+            all_green = False
+    open_clr = db.query_one(
+        "SELECT id FROM clarification_requests WHERE application_id=? AND status='open'",
+        (application_id,))
+    if open_clr:
+        all_green = False
+
+    # Auto-form provenance (AI/autofill generated, hash-bound).
+    form = db.query_one(
+        "SELECT filename, verification_code, source, sha256, generated_at, "
+        "submitted_at FROM generated_forms WHERE application_id=? "
+        "ORDER BY generated_at DESC LIMIT 1", (application_id,))
+
     return {
         "ai_summary": summary,          # AI suggestion (checklist, not verdict)
         "deterministic_data": {         # system facts
@@ -102,6 +152,14 @@ def pre_scrutiny(application_id: str,
             "documents": ctx["documents"],
             "green_channel_eligible": bool(app_row["green_channel"]),
         },
+        "one_click": {
+            "all_green": all_green,
+            "required_matrix": matrix,
+            "readiness_100": (app_row["readiness_score"] or 0) >= 100,
+            "note": ("All deterministic parameters satisfied — officer retains "
+                     "full authority to approve, clarify or reject."),
+        },
+        "form": dict(form) if form else None,
         "principle": "AI explains; rules and the officer decide.",
     }
 

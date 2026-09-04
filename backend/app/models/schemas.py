@@ -85,3 +85,17 @@ class SmsDispatchRequest(BaseModel):
     user_id: str = ""
     application_id: str = ""
     message: str = Field(min_length=1, max_length=300)
+
+
+class DigiLockerConsentRequest(BaseModel):
+    aadhaar_number: str = Field(min_length=12, max_length=24)
+
+
+class DigiLockerVerifyRequest(BaseModel):
+    otp: str = Field(min_length=4, max_length=8)
+
+
+class DigiLockerApplyRequest(BaseModel):
+    pan: str = Field(default="", max_length=20)
+    gst: str = Field(default="", max_length=20)
+    authorized_person: str = Field(default="", max_length=120)

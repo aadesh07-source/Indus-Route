@@ -212,6 +212,53 @@ export async function uploadDocument(
   return data;
 }
 
+// ── DigiLocker e-KYC auto-fill ────────────────────────────────
+export function startDigiLocker(aadhaarNumber: string) {
+  return api.post<{ consent_id: string; aadhaar_masked: string; demo_otp: string | null; mode: string }>(
+    "/digilocker/consent", { aadhaar_number: aadhaarNumber });
+}
+export function verifyDigiLocker(consentId: string, otp: string) {
+  return api.post<{ status: string; verified: any }>(
+    `/digilocker/consent/${consentId}/verify`, { otp });
+}
+export function applyDigiLocker(consentId: string, payload: { pan?: string; gst?: string; authorized_person?: string }) {
+  return api.post<{ status: string; verified_identity: any; updated_fields: any }>(
+    `/digilocker/consent/${consentId}/apply`, payload);
+}
+export function digiLockerStatus() {
+  return api.get<{ kyc_verified: boolean; identity?: any }>("/digilocker/status");
+}
+
+// ── Unified auto-generated application form (PDF) ─────────────
+export function generateForm(applicationId: string) {
+  return api.post<{ form_id: string; filename: string; verification_code: string; sha256: string; kyc_bound: boolean; size_bytes: number }>(
+    `/applications/${applicationId}/generate-form`);
+}
+export function submitWithForm(applicationId: string) {
+  return api.post<{ form_verification_code: string; dispatched: string }>(
+    `/applications/${applicationId}/submit-form`);
+}
+export async function downloadFormPdf(applicationId: string) {
+  const token = getToken();
+  const res = await fetch(`/api/applications/${applicationId}/form.pdf`,
+    { headers: token ? { Authorization: "Bearer " + token } : {} });
+  if (!res.ok) throw new Error("Form not available yet");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `UAF-${applicationId.slice(-8)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ── Officer instant-queue polling ─────────────────────────────
+export function getQueueVersion() {
+  return api.get<{ version: string }>("/officer/queue/version");
+}
+
 export function health(): Promise<Health> {
   return api.get<Health>("/health");
 }

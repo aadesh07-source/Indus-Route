@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Container, Row, Col, Card, Button, Table } from "react-bootstrap";
 import { motion } from "motion/react";
 import { AlertTriangle, Clock, CheckCircle2, ClipboardCheck, Shield } from "lucide-react";
-import { getToken, setToken, getOfficerQueue } from "@/lib/api";
+import { getToken, setToken, getOfficerQueue, getQueueVersion } from "@/lib/api";
 import StatCard from "@/components/ui/StatCard";
 import AttentionTag from "@/components/ui/AttentionTag";
 import SlaRing from "@/components/ui/SlaRing";
@@ -37,6 +37,35 @@ export default function OfficerPortal() {
 
   useEffect(() => { setAuthed(getToken() ? null : false); }, []);
   useEffect(() => { if (authed === null) loadQueue(); }, [authed, loadQueue]);
+
+  // Instant dispatch: poll the lightweight queue version every 4s and
+  // reload the moment a new application lands (WebSocket/Supabase
+  // Realtime replaces this in production).
+  useEffect(() => {
+    if (authed !== true) return;
+    let lastVersion = "";
+    const seen = new Set<string>();
+    const t = setInterval(async () => {
+      try {
+        const v = (await getQueueVersion()).version;
+        if (lastVersion && v !== lastVersion) {
+          const q = await getOfficerQueue();
+          const ids = new Set([...q.assigned, ...q.unassigned].map((e: any) => e.id));
+          const fresh = [...ids].filter((id) => !seen.has(id));
+          setQueue(q);
+          if (fresh.length > 0 && seen.size > 0) {
+            setMsg("New application received — instantly routed to your portal.");
+          }
+          fresh.forEach((id) => seen.add(id));
+        } else if (!lastVersion) {
+          const q = await getOfficerQueue();
+          [...q.assigned, ...q.unassigned].forEach((e: any) => seen.add(e.id));
+        }
+        lastVersion = v;
+      } catch { /* transient errors ignored; next tick retries */ }
+    }, 4000);
+    return () => clearInterval(t);
+  }, [authed]);
 
   if (authed === false) return (
     <Container fluid="xxl" className="py-5"><Card className="mx-auto" style={{ maxWidth: 520 }}>

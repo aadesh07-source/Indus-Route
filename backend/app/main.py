@@ -18,6 +18,7 @@ from fastapi.exceptions import RequestValidationError
 
 from . import config, db
 from .api import auth, profiles, applications, documents, officer, admin, webhooks
+from .api import autofill
 from .core import scheduler
 from .core.pii import pii_status
 from .notifications.sms_gateway import gateway_status
@@ -83,6 +84,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(profiles.router)
+    app.include_router(autofill.router)
     app.include_router(applications.router)
     app.include_router(documents.router)
     app.include_router(officer.router)
