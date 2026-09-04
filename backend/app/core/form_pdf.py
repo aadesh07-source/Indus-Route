@@ -143,18 +143,21 @@ def build_application_pdf(ctx: dict) -> bytes:
     y = MARGIN
 
     # ---- Header band ----
-    p.rect_fill(x0, y, x1 - x0, 64, 0.06)
-    p.text(x0 + 12, y + 22, 13, "GOVERNMENT OF MAHARASHTRA", True, 1.0)
-    p.text(x0 + 12, y + 40, 10.5,
-           "Unified Industrial Application Form - Single Window (SIH26130)",
-           False, 1.0)
-    p.text(x0 + 12, y + 55, 8,
-           "Auto-generated from DigiLocker e-KYC and the deterministic rule engine",
+    p.rect_fill(x0, y, x1 - x0, 78, 0.06)
+    p.text(x0 + 12, y + 24, 17, "INDUS ROUTE", True, 1.0)
+    p.text(x0 + 12, y + 42, 9.5,
+           "Intelligent Industrial Approval & Compliance Platform", False, 0.8)
+    p.text(x0 + 12, y + 58, 12,
+           "UNIFIED INDUSTRIAL APPLICATION FORM", True, 1.0)
+    p.text(x0 + 12, y + 72, 8,
+           "Government of Maharashtra Single Window System (SIH26130)",
            False, 0.75)
-    p.text(x1 - 150, y + 22, 9, "Form No: " + ctx["form_no"][-12:], True, 1.0)
-    p.text(x1 - 150, y + 38, 8, "Generated: " + ctx["generated_at"][:19], False, 1.0)
-    p.text(x1 - 150, y + 52, 8, "Verify: " + ctx["verification_code"], True, 1.0)
-    y += 84
+    p.text(x1 - 160, y + 24, 9, "Form No: " + ctx["form_no"][-12:], True, 1.0)
+    p.text(x1 - 160, y + 40, 8, "Generated: " + ctx["generated_at"][:19], False, 1.0)
+    p.text(x1 - 160, y + 54, 8, "Verify: " + ctx["verification_code"], True, 1.0)
+    p.text(x1 - 160, y + 68, 8, "e-KYC: " + str(
+        kyc.get("kyc_status", "not verified")).upper(), False, 1.0)
+    y += 98
     p.hline(x0, x1, y)
     y += 16
 
@@ -203,7 +206,7 @@ def build_application_pdf(ctx: dict) -> bytes:
 
     # ---- Section C: sector clearance checklist ----
     p.text(x0, y, 11,
-           "C.  SECTOR CLEARANCE CHECKLIST (DETERMINISTIC RULE ENGINE)", True)
+           "C.  CLEARANCES REQUIRED & TO BE VERIFIED (RULE-ENGINE DETERMINED)", True)
     y += 16
     p.rect_fill(x0, y - 3, x1 - x0, 15, 0.92)
     p.text(x0 + 6, y + 8, 8, "APPROVAL", True, 1.0)
@@ -216,6 +219,10 @@ def build_application_pdf(ctx: dict) -> bytes:
         p.text(x0 + 200, y, 8, a.get("department", "")[:33])
         p.text(x0 + 400, y, 8, str(a.get("sla_days", "")))
         p.text(x0 + 470, y, 8, "ELIGIBLE" if a.get("green_channel_eligible") else "-")
+        y += 11
+        p.text(x0 + 20, y, 7, "Documents required: " + ", ".join(
+            str(d).replace("_", " ") for d in a.get("required_documents", []))[:92],
+            False, 0.45)
         p.hline(x0, x1, y + 5, 0.4, 0.8)
         y += 14
     for e in checklist.get("excluded", [])[:4]:
@@ -285,10 +292,15 @@ def build_application_pdf(ctx: dict) -> bytes:
     p.text(x0 + 90, y + 24, 7.5, "SHA-256: " + ctx["sha256"])
     p.text(x0 + 90, y + 36, 7.5, "Verification code: " + ctx["verification_code"])
     p.text(x0 + 90, y + 48, 7.5,
-           "Verify at: GET /forms/verify/{} (single-window system)".format(
+           "Verify at: GET /forms/verify/{} (Indus Route single-window system)".format(
                ctx["verification_code"]))
     p.text(x0 + 90, y + 60, 7.5,
-           "Form generated programmatically at {} - tamper-evident: any edit "
-           "invalidates the hash.".format(ctx["generated_at"][:19]))
+           "Generated programmatically by INDUS ROUTE at {} - tamper-evident: "
+           "any edit invalidates the hash.".format(ctx["generated_at"][:19]))
+    y += 74
+    p.hline(x0, x1, y)
+    y += 12
+    p.text(x0, y, 7.5, "INDUS ROUTE  ·  Intelligent Industrial Approval & Compliance "
+           "Platform  ·  SIH26130 demo build", False, 0.55)
     return p.build()
 

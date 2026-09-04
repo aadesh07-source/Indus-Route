@@ -210,26 +210,19 @@ def submit_application(application_id: str, user: dict = Depends(get_current_use
 
 
 
-@router.post("/applications/{application_id}/generate-form")
-def generate_form(application_id: str, user: dict = Depends(get_current_user)):
-    """Auto-generate the Unified Application Form PDF from e-KYC data,
-    the business profile, the rule-engine checklist and document validation."""
-    app_row = _load_application(application_id)
-    _assert_can_view(app_row, user)
-    if app_row["status"] not in ("draft", "clarification_pending"):
-        raise HTTPException(status_code=409,
-                            detail="Form can only be generated while in draft.")
+def _build_and_store_form(app_row: dict, user: dict) -> dict:
+    """Core form-generation logic shared by the generate + download endpoints."""
     profile = db.query_one("SELECT * FROM business_profiles WHERE id=?",
                            (app_row["business_id"],))
     approval = _approval_dict(db.query_one(
         "SELECT * FROM approvals WHERE id=?", (app_row["approval_id"],)))
-    documents = _app_documents(application_id)
+    documents = _app_documents(app_row["id"])
     checklist = evaluate_profile(load_profile_dict(profile))
     kyc = digilocker.latest_verified(profile["owner_id"])
     applicant = db.query_one("SELECT name FROM users WHERE id=?",
                              (profile["owner_id"],))
 
-    identity = form_pdf.new_form_identity(application_id, app_row["business_id"])
+    identity = form_pdf.new_form_identity(app_row["id"], app_row["business_id"])
     pdf_bytes = form_pdf.build_application_pdf({
         "form_no": identity["form_no"],
         "generated_at": identity["generated_at"],
@@ -251,7 +244,7 @@ def generate_form(application_id: str, user: dict = Depends(get_current_user)):
         "INSERT INTO generated_forms (id, application_id, business_id, filename, "
         "file_ref, sha256, verification_code, source, checklist_snapshot, "
         "generated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (form_id, application_id, app_row["business_id"], filename,
+        (form_id, app_row["id"], app_row["business_id"], filename,
          str(file_path), identity["sha256"], identity["verification_code"],
          "kyc-autofill" if kyc else "profile-autofill",
          db.jdumps({"sector": checklist.get("sector"),
@@ -266,21 +259,34 @@ def generate_form(application_id: str, user: dict = Depends(get_current_user)):
         "verification_code": identity["verification_code"],
         "sha256": identity["sha256"],
         "kyc_bound": bool(kyc),
-        "download_url": "/api/applications/{}/form.pdf".format(application_id),
+        "download_url": "/api/applications/{}/form.pdf".format(app_row["id"]),
         "size_bytes": len(pdf_bytes),
     }
 
 
+@router.post("/applications/{application_id}/generate-form")
+def generate_form(application_id: str, user: dict = Depends(get_current_user)):
+    """Auto-generate the Unified Application Form PDF from e-KYC data,
+    the business profile, the rule-engine checklist and document validation."""
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    return _build_and_store_form(app_row, user)
+
+
 @router.get("/applications/{application_id}/form.pdf")
 def download_form(application_id: str, user: dict = Depends(get_current_user)):
+    """Serve the latest form PDF; auto-generate one on demand if missing
+    (so the download button always works, at any application stage)."""
     app_row = _load_application(application_id)
     _assert_can_view(app_row, user)
     form = db.query_one(
         "SELECT * FROM generated_forms WHERE application_id=? "
         "ORDER BY generated_at DESC LIMIT 1", (application_id,))
     if form is None:
-        raise HTTPException(status_code=404,
-                            detail="No generated form for this application yet.")
+        _build_and_store_form(app_row, user)
+        form = db.query_one(
+            "SELECT * FROM generated_forms WHERE application_id=? "
+            "ORDER BY generated_at DESC LIMIT 1", (application_id,))
     try:
         data = (config.DATA_DIR / "forms" / "{}.pdf".format(form["id"])).read_bytes()
     except OSError:

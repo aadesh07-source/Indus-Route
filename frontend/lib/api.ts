@@ -247,7 +247,7 @@ export async function downloadFormPdf(applicationId: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `UAF-${applicationId.slice(-8)}.pdf`;
+  a.download = `IndusRoute-Application-Form-${applicationId.slice(-8)}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();
