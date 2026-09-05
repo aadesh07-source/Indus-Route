@@ -2,18 +2,20 @@
 "use client";
 import { useState } from "react";
 import { Offcanvas, Card, Button, Form, ListGroup } from "react-bootstrap";
-import { CheckCircle2, XCircle, Send, Calendar, Eye, UserCheck, Shield, Zap, FileDown, FileCheck2 } from "lucide-react";
-import { assignApplication, getPreScrutiny, officerDecision, scheduleInspection, getToken, downloadFormPdf, signParameter } from "@/lib/api";
+import { CheckCircle2, XCircle, Send, Calendar, Eye, UserCheck, Shield, Zap, FileDown, FileCheck2, AlertTriangle, Award } from "lucide-react";
+import { assignApplication, getPreScrutiny, officerDecision, scheduleInspection, getToken, downloadFormPdf, signParameter, draftSendback } from "@/lib/api";
 
 export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg, onErr }: any) {
   const [prescrutiny, setPrescrutiny] = useState<any>(null);
   const [draft, setDraft] = useState<any>(null);
   const [clarText, setClarText] = useState("");
+  const [sendBackText, setSendBackText] = useState("");
+  const [issueCert, setIssueCert] = useState(false);
   const [inspDate, setInspDate] = useState("");
 
   async function open() {
     if (!selected) return;
-    onErr(""); onMsg(""); setDraft(null); setClarText("");
+    onErr(""); onMsg(""); setDraft(null); setClarText(""); setSendBackText(""); setIssueCert(false);
     try { setPrescrutiny(await getPreScrutiny(selected.id)); }
     catch (e: any) { onErr(e.message); }
   }
@@ -22,8 +24,13 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
     if (!selected) return;
     onErr(""); onMsg("");
     try {
-      const res = await officerDecision(selected.id, action, "", (extra as any).clarification_text);
-      onMsg(`Decision '${action}' recorded (${res.status}).`);
+      const notes = (extra as any).notes ?? "";
+      const res = await officerDecision(selected.id, action, notes, (extra as any).clarification_text);
+      if (action === "approve" && res.sanction_letter) {
+        onMsg(`Approved — sanction letter ${res.sanction_letter.certificate_no} generated and delivered to the applicant's portal.`);
+      } else {
+        onMsg(`Decision '${action}' recorded (${res.status}).`);
+      }
       onReload(); onClose();
     } catch (e: any) { onErr(e.message); }
   }
@@ -43,6 +50,43 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
       const data = await res.json();
       if (!res.ok) throw new Error(data?.detail || "Draft failed");
       setDraft(data); setClarText(data.draft || "");
+    } catch (e: any) { onErr(e.message); }
+  }
+
+  async function getSendbackDraft() {
+    if (!selected) return;
+    onErr(""); onMsg("");
+    try {
+      const r = await draftSendback(selected.id);
+      setSendBackText(r.draft || "");
+      onMsg("AI drafted the corrections list — review and edit before sending back.");
+    } catch (e: any) { onErr(e.message); }
+  }
+
+  async function sendBack() {
+    if (!selected || !sendBackText.trim()) return;
+    onErr(""); onMsg("");
+    try {
+      await officerDecision(selected.id, "send_back", sendBackText.trim(), "");
+      onMsg("Form sent back to applicant with your correction notes.");
+      onReload(); onClose();
+    } catch (e: any) { onErr(e.message); }
+  }
+
+  async function issueCertificate() {
+    if (!selected) return;
+    onErr(""); onMsg("");
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/officer/applications/${selected.id}/issue-certificate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ certificate_type: "sanction_clearance" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || "Certificate issue failed");
+      onMsg(`Certificate ${data.certificate_no} issued — applicant will see & download it in their portal.`);
+      onReload(); onClose();
     } catch (e: any) { onErr(e.message); }
   }
 
@@ -160,16 +204,44 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
           <Button className="btn-mono" onClick={() => act("approve")}><Shield size={14} /> Approve</Button>
           <Button className="btn-mono btn-outline-mono" style={{ borderColor: "#ff3b30", color: "#ff3b30" }} onClick={() => act("reject")}><XCircle size={14} /> Reject</Button>
           <Button className="btn-mono btn-outline-mono" onClick={getDraft}><Eye size={14} /> Draft clarification</Button>
+          <Button className="btn-mono btn-outline-mono" onClick={getSendbackDraft}><AlertTriangle size={14} /> Send back (AI draft)</Button>
         </div>
         {draft && (<div className="mb-3">
           <p style={{ fontSize: ".72rem", color: "#c9c9c4" }} className="mb-1">AI draft ({draft.source}) — edit before sending.</p>
           <Form.Control as="textarea" rows={4} value={clarText} onChange={(e: any) => setClarText(e.target.value)} style={{ fontSize: ".82rem", background: "#0a0a0a", color: "#fff", borderColor: "#333" }} />
           <Button className="btn-mono mt-2" onClick={() => act("clarify", { clarification_text: clarText })}><Send size={14} /> Send clarification</Button>
         </div>)}
+        {sendBackText !== null && (
+          <div className="mb-3">
+            <p style={{ fontSize: ".72rem", color: "#ff9f0a" }} className="mb-1">
+              <AlertTriangle size={11} className="me-1" />
+              Send-back corrections — AI drafted, edit then send. Applicant will see this text on their portal.
+            </p>
+            <Form.Control as="textarea" rows={5} value={sendBackText} onChange={(e: any) => setSendBackText(e.target.value)}
+              placeholder="Use 'AI draft' button to populate, then edit…"
+              style={{ fontSize: ".82rem", background: "#0a0a0a", color: "#fff", borderColor: "#ff9f0a" }} />
+            <Button className="btn-mono mt-2" style={{ background: "#ff9f0a", borderColor: "#ff9f0a" }}
+              onClick={sendBack} disabled={!sendBackText.trim()}>
+              <Send size={14} /> Send back to applicant
+            </Button>
+          </div>
+        )}
         <div className="d-flex gap-2 mt-3">
           <Form.Control type="date" value={inspDate} onChange={(e: any) => setInspDate(e.target.value)} style={{ fontSize: ".82rem", background: "#0a0a0a", color: "#fff", borderColor: "#333" }} />
           <Button className="btn-mono flex-shrink-0" onClick={schedule}><Calendar size={14} /> Schedule inspection</Button>
         </div>
+        {selected.status === "approved" && (
+          <div className="mt-3">
+            <Button className="btn-mono w-100" style={{ background: "#0a0", borderColor: "#0a0", color: "#fff" }}
+              onClick={issueCertificate}>
+              <Award size={14} /> Issue Sanction Letter (if not auto-generated)
+            </Button>
+            <p style={{ fontSize: ".72rem", color: "#c9c9c4" }} className="mt-1">
+              Final Approve already generates the sanctioned letter automatically and pushes it to the
+              applicant's Application panel. Use this only as a fallback.
+            </p>
+          </div>
+        )}
       </Offcanvas.Body>
     </Offcanvas>
   );

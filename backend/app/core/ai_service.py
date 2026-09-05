@@ -77,15 +77,14 @@ def summarize_rule_output(checklist: dict) -> dict:
     fallback = (
         "Based on your profile for the '{sector}' sector, the rule engine has "
         "deterministically identified {count} applicable approval(s): {names}. "
-        "Approvals in the same parallel group ({groups}) can be pursued simultaneously. "
-        "The longest single SLA is {max_sla} days. Each approval lists the exact "
-        "documents required — upload them to receive a readiness score."
+        "Approvals in the same parallel group ({groups}) can be pursued simultaneously "
+        "and are tracked live against your submitted applications. Each approval lists "
+        "the exact documents required — upload them to receive a readiness score."
     ).format(
         sector=sector,
         count=len(approvals),
         names=", ".join(a["name"] for a in approvals),
         groups=", ".join(sorted(checklist.get("parallel_groups", {}).keys())),
-        max_sla=checklist.get("max_sla_days", 0),
     )
     if not _gemini_available():
         return {"text": fallback, "source": "deterministic-template", "ai_generated": False}

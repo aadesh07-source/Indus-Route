@@ -1,0 +1,68 @@
+{
+  "sector": "energy",
+  "label": "Renewable Energy & Data Centers",
+  "approvals": [
+    {
+      "id": "en_open_access",
+      "code": "OPEN-ACCESS",
+      "name": "Green Energy Open Access Clearance",
+      "department": "MSEDCL / SLDC Maharashtra",
+      "description": "Sanction for captive renewable grid tie-ins and wheeling/banking agreements.",
+      "sla_days": 30,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["gst_certificate", "lease_deed", "self_declaration"]
+    },
+    {
+      "id": "en_ceig",
+      "code": "CEIG-SANCTION",
+      "name": "CEIG Commissioning Safety Certificate",
+      "department": "Chief Electrical Inspector to Govt of Maharashtra",
+      "description": "Mandatory safety certificate for MW-scale solar arrays, inverters and BESS.",
+      "sla_days": 35,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["electrical_certificate", "factory_layout"]
+    },
+    {
+      "id": "en_cooling",
+      "code": "DC-COOLING-WATER",
+      "name": "Data Center Continuous Cooling Water Sanction",
+      "department": "Maharashtra Industrial Water Authority",
+      "description": "Industrial water allocation for high-tonnage chiller plants and evaporative cooling loops.",
+      "sla_days": 25,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 5000000},
+      "required_documents": ["water_noc", "lease_deed"]
+    },
+    {
+      "id": "en_aai",
+      "code": "AAI-NOC",
+      "name": "Civil Aviation Height Clearance (AAI NOC)",
+      "department": "Airports Authority of India",
+      "description": "Height clearance if located within radar or airport funnel zones.",
+      "sla_days": 30,
+      "parallel_group": "C",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["factory_layout", "self_declaration"]
+    },
+    {
+      "id": "en_shop_est",
+      "code": "SHOP-EST",
+      "name": "Shop & Establishment Registration",
+      "department": "Labour Department",
+      "description": "Required for establishments with commercial activity.",
+      "sla_days": 10,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "condition": {"field": "employee_count", "op": "gte", "value": 5},
+      "required_documents": ["pan_card", "self_declaration"]
+    }
+  ]
+}

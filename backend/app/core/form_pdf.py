@@ -304,3 +304,62 @@ def build_application_pdf(ctx: dict) -> bytes:
            "Platform  ·  SIH26130 demo build", False, 0.55)
     return p.build()
 
+def build_sanction_certificate(ctx: dict) -> bytes:
+    """Generate a Sanction Clearance Certificate PDF after final approval."""
+    p = PDFBuilder()
+    x0, x1 = MARGIN, PAGE_W - MARGIN
+    y = MARGIN + 10
+
+    # Header
+    p.rect_fill(x0, y - 3, x1 - x0, 40, 0.92)
+    p.text(x0 + 6, y + 8, 14, "INDUS ROUTE", True, 1.0)
+    p.text(x0 + 6, y + 26, 7.5, "Intelligent Industrial Approval & Compliance Platform", False, 1.0)
+    p.text(x1 - 130, y + 8, 8, "SANCTION CERTIFICATE", True, 0.6)
+    p.text(x1 - 130, y + 24, 7, "Certificate No: " + ctx.get("certificate_no", ""), False, 0.6)
+    y += 56
+
+    p.text(x0, y, 11, "CERTIFICATE OF CLEARANCE", True)
+    y += 20
+    p.text(x0, y, 8.5, "This is to certify that the following application has been reviewed and cleared:", False)
+    y += 22
+
+    # Application details
+    fields = [
+        ("Application ID", ctx.get("app_id", "")),
+        ("Business Name", ctx.get("business_name", "")),
+        ("Sector", ctx.get("sector", "")),
+        ("Approval Type", ctx.get("approval_name", "")),
+        ("Department", ctx.get("department", "")),
+        ("Applicant", ctx.get("applicant_name", "")),
+        ("Authorized Person", ctx.get("authorized_person", "")),
+        ("Location", ctx.get("location", "")),
+        ("Submission Date", ctx.get("submitted_at", "")[:10]),
+        ("Approval Date", ctx.get("approved_at", "")[:10]),
+        ("Issuing Officer", ctx.get("officer_name", "")),
+    ]
+    for label, value in fields:
+        p.text(x0 + 6, y, 8.5, label + ":", True)
+        p.text(x0 + 180, y, 8.5, str(value or "—"), False)
+        y += 16
+
+    y += 8
+    p.hline(x0, x1, y)
+    y += 14
+
+    # Clearances approved
+    p.text(x0, y, 10, "CLEARANCES APPROVED", True)
+    y += 18
+    for clearance in ctx.get("clearances", []):
+        p.text(x0 + 12, y, 9, "[OK] " + clearance, True)
+        y += 16
+
+    y += 8
+    p.text(x0, y, 8.5, "This certificate is issued electronically and is valid without physical signature.", False, 0.45)
+    y += 14
+    p.text(x0, y, 8.5, "Verification code: " + ctx.get("certificate_code", ""), False, 0.45)
+    y += 20
+    p.hline(x0, x1, y)
+    y += 14
+    p.text(x0, y, 7.5, "INDUS ROUTE  ·  Generated at {}  ·  SIH26130".format(ctx.get("generated_at", "")[:19]), False, 0.55)
+
+    return p.build()

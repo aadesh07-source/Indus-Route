@@ -23,13 +23,19 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 - Interactive API docs: <http://127.0.0.1:8000/docs>
 - Health/system status: <http://127.0.0.1:8000/health>
 
-Demo accounts (seeded automatically):
+Demo accounts (seeded automatically — every industry has its own demo ID & password):
 
-| Role | Phone | Password |
-|---|---|---|
-| Applicant | 9000000001 | Demo@123 |
-| Officer | 9000000002 | Demo@123 |
-| Admin | 9000000003 | Demo@123 |
+| Industry demo | Demo ID | Phone | Password |
+|---|---|---|---|
+| Food Processing | PUNE-FOODS-001 | 9000000001 | Foods@2026 |
+| Pharmaceuticals & Bulk Drug | PUNE-PHARMA-002 | 9000000011 | Pharma@2026 |
+| Automobile & Heavy Engineering | PUNE-AUTO-003 | 9000000021 | Auto@2026 |
+| Electronics / ESDM | PUNE-ESDM-004 | 9000000031 | Esdm@2026 |
+| Logistics & Cold Chain | PUNE-LOGI-005 | 9000000041 | Logi@2026 |
+| Distilleries & Breweries | PUNE-DIST-006 | 9000000051 | Distill@2026 |
+| Renewable Energy & Data Centers | PUNE-ENERGY-007 | 9000000061 | Energy@2026 |
+| Officer | — | 9000000002 | Demo@123 |
+| Admin | — | 9000000003 | Demo@123 |
 
 Officer/admin self-registration requires the invite code
 `MAHARASHTRA-2026` (configurable via `SIH_ADMIN_INVITE_CODE`).

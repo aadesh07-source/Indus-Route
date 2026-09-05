@@ -7,8 +7,17 @@ import { Card, Button, Form } from "react-bootstrap";
 import { api, setToken, setUser } from "@/lib/api";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 
-const DEMO = [
-  { label: "Applicant", id: "9000000001" },
+const INDUSTRIES = [
+  { label: "Pune Foods", demoId: "PUNE-FOODS-001", id: "9000000001", pw: "Foods@2026" },
+  { label: "Pune Pharma", demoId: "PUNE-PHARMA-002", id: "9000000011", pw: "Pharma@2026" },
+  { label: "Pune Auto", demoId: "PUNE-AUTO-003", id: "9000000021", pw: "Auto@2026" },
+  { label: "Pune ESDM", demoId: "PUNE-ESDM-004", id: "9000000031", pw: "Esdm@2026" },
+  { label: "Pune Logistics", demoId: "PUNE-LOGI-005", id: "9000000041", pw: "Logi@2026" },
+  { label: "Pune Distillery", demoId: "PUNE-DIST-006", id: "9000000051", pw: "Distill@2026" },
+  { label: "Pune Renewable Energy", demoId: "PUNE-ENERGY-007", id: "9000000061", pw: "Energy@2026" },
+];
+
+const OFFICIALS = [
   { label: "Officer", id: "9000000002" },
   { label: "Admin", id: "9000000003" },
 ];
@@ -16,7 +25,7 @@ const DEMO = [
 export default function Login() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("9000000001");
-  const [password, setPassword] = useState("Demo@123");
+  const [password, setPassword] = useState("Foods@2026");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -83,10 +92,30 @@ export default function Login() {
             <hr className="my-4" />
             <div className="d-flex flex-column gap-2">
               <div className="d-flex align-items-center gap-2" style={{ color: "#6d6d6d", fontSize: ".78rem" }}>
-                <ShieldCheck size={14} /> Demo accounts — password <span className="mono">Demo@123</span>
+                <ShieldCheck size={14} /> Industry demos — each has its own demo ID & password (click to autofill)
               </div>
               <div className="d-flex flex-wrap gap-2">
-                {DEMO.map((d) => (
+                {INDUSTRIES.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className="badge border text-dark"
+                    style={{ background: "#f6f6f4", cursor: "pointer", fontFamily: "monospace", textAlign: "left", lineHeight: 1.5 }}
+                    onClick={() => {
+                      setIdentifier(d.id);
+                      setPassword(d.pw);
+                    }}
+                  >
+                    {d.label}<br />
+                    <span style={{ fontSize: ".62rem", color: "#6d6d6d" }}>{d.demoId} · {d.id} · {d.pw}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="d-flex align-items-center gap-2 mt-2" style={{ color: "#6d6d6d", fontSize: ".78rem" }}>
+                <ShieldCheck size={14} /> Officer / Admin
+              </div>
+              <div className="d-flex flex-wrap gap-2">
+                {OFFICIALS.map((d) => (
                   <button
                     key={d.id}
                     type="button"

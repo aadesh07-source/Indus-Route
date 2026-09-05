@@ -254,6 +254,40 @@ export async function downloadFormPdf(applicationId: string) {
   URL.revokeObjectURL(url);
 }
 
+export function updateSelectedSchemes(applicationId: string, schemeIds: string[]) {
+  return api.post<{ selected_schemes: string[]; count: number }>(
+    `/applications/${applicationId}/schemes`, { scheme_ids: schemeIds });
+}
+
+export function autoFillFromData(applicationId: string) {
+  return api.post<{ auto_filled: boolean; sources: any; form: any }>(
+    `/applications/${applicationId}/auto-fill-from-data`);
+}
+
+export function resubmitApplication(applicationId: string) {
+  return api.post<any>(`/applications/${applicationId}/resubmit`);
+}
+
+export function draftSendback(applicationId: string) {
+  return api.post<any>(`/officer/applications/${applicationId}/draft-sendback`);
+}
+
+export async function downloadCertificatePdf(applicationId: string) {
+  const token = getToken();
+  const res = await fetch(`/api/applications/${applicationId}/certificate.pdf`,
+    { headers: token ? { Authorization: "Bearer " + token } : {} });
+  if (!res.ok) throw new Error("Certificate not yet issued");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `IndusRoute-SANCTION-${applicationId.slice(-8)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ── Officer instant-queue polling ─────────────────────────────
 export function getQueueVersion() {
   return api.get<{ version: string }>("/officer/queue/version");

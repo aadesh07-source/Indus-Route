@@ -45,7 +45,7 @@ class CreateApplicationRequest(BaseModel):
 
 
 class DecisionRequest(BaseModel):
-    action: Literal["verify", "clarify", "approve", "reject"]
+    action: Literal["verify", "clarify", "approve", "reject", "send_back"] = "verify"
     notes: str = Field(default="", max_length=4000)
     clarification_text: str = Field(default="", max_length=4000)
 
@@ -104,3 +104,7 @@ class DigiLockerApplyRequest(BaseModel):
 class SignParameterRequest(BaseModel):
     param_key: str = Field(min_length=1, max_length=80)
     note: str = Field(default="", max_length=500)
+
+
+class CertificateRequest(BaseModel):
+    certificate_type: str = Field(default="sanction_clearance", max_length=60)

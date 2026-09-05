@@ -1,11 +1,11 @@
 // @ts-nocheck
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Container, Row, Col, Card, Button, Form, Badge, ListGroup } from "react-bootstrap";
+import { Container, Row, Col, Card, Button, Form, Badge, ListGroup, ProgressBar } from "react-bootstrap";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { ArrowLeft, Upload, ScanLine, FileCheck2, CheckCircle2, XCircle } from "lucide-react";
-import { getToken, listApplications, uploadDocument, DOC_LABELS, titleCase, getMyProfile, getDocumentSpecs } from "@/lib/api";
+import { getToken, listApplications, uploadDocument, DOC_LABELS, titleCase, getMyProfile, getDocumentSpecs, getApplication } from "@/lib/api";
 
 type AppRow = { id: string; status: string; approval_code: string; approval_name: string; department: string; documents?: any[] };
 
@@ -23,11 +23,19 @@ export default function UploadCentre() {
   const [specs, setSpecs] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [declared, setDeclared] = useState<Record<string, string>>({});
+  const [detail, setDetail] = useState<any>(null);
 
   const load = useCallback(async () => {
     try {
       const list = await listApplications();
       setApps(list.applications || []);
+      // Auto-select the first in-flight application so the readiness panel is live immediately.
+      setAppId((prev) => {
+        if (prev) return prev;
+        const firstOpen = (list.applications || []).find(
+          (x: any) => !["approved", "rejected", "provisionally_cleared"].includes(x.status));
+        return firstOpen ? firstOpen.id : "";
+      });
       setAuthed(true);
       try { setProfile((await getMyProfile()).profile); } catch { /* optional */ }
       setSpecs((await getDocumentSpecs()).specs || []);
@@ -51,19 +59,25 @@ export default function UploadCentre() {
 
   useEffect(() => { setAuthed(getToken() ? null : false); }, []);
   useEffect(() => { if (authed === null) load(); }, [authed, load]);
+  // Live document readiness for the selected application (fetched with documents).
+  const refreshDetail = useCallback(async () => {
+    if (!appId) { setDetail(null); return; }
+    try { setDetail(await getApplication(appId)); } catch { setDetail(null); }
+  }, [appId]);
+  useEffect(() => { refreshDetail(); }, [appId, refreshDetail]);
   useEffect(() => {
     const a = new URLSearchParams(window.location.search).get("app");
     if (a) setAppId(a);
   }, []);
 
   async function submit() {
-    if (!appId || !file) return;
+    if (!appId || !file || selectedDecided) return;
     setBusy(true); setErr(""); setMsg(""); setResult(null);
     try {
       const res = await uploadDocument(appId, docType, file, declared);
       setResult(res);
       setMsg("Document scanned — " + res.summary.checks_passed + "/" + res.summary.checks_total + " checks passed.");
-      load();
+      await Promise.all([load(), refreshDetail()]);
     } catch (e: any) { setErr(e.message); }
     finally { setBusy(false); }
   }
@@ -82,6 +96,10 @@ export default function UploadCentre() {
   }
 
   const selected = apps.find((a) => a.id === appId);
+  // Applications with a final decision are locked — only in-flight ones accept documents.
+  const DECIDED = ["approved", "rejected", "provisionally_cleared"];
+  const editableApps = apps.filter((a) => !DECIDED.includes(a.status));
+  const selectedDecided = !!selected && DECIDED.includes(selected.status);
 
   return (
     <Container fluid="xxl" className="py-4">
@@ -104,15 +122,29 @@ export default function UploadCentre() {
             <span className="kicker">Step 1 · Target</span>
             <Form.Group className="mt-2 mb-3">
               <Form.Label className="stat-lbl">Application</Form.Label>
-              <Form.Select value={appId} onChange={(e) => { setAppId(e.target.value); setResult(null); }}>
-                <option value="">Select an application…</option>
-                {apps.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.approval_code} · {a.department} ({a.status.replace(/_/g, " ")})
-                  </option>
-                ))}
-              </Form.Select>
-              {selected && (
+              {editableApps.length === 0 ? (
+                <div className="alert alert-warning py-2 mb-0" style={{ fontSize: ".78rem", borderLeft: "4px solid #ff9f0a" }}>
+                  All your applications already have a final decision, so they are locked for uploads.
+                  Create a fresh draft application from the <Link href="/applicant">Application tab</Link> first —
+                  documents are uploaded and pre-validated <strong>before</strong> you submit the form.
+                </div>
+              ) : (
+                <Form.Select value={appId} onChange={(e) => { setAppId(e.target.value); setResult(null); }}>
+                  <option value="">Select an application…</option>
+                  {editableApps.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.approval_code} · {a.department} ({a.status.replace(/_/g, " ")})
+                    </option>
+                  ))}
+                </Form.Select>
+              )}
+              {selectedDecided && (
+                <div className="alert alert-warning py-2 mt-2 mb-0" style={{ fontSize: ".76rem", borderLeft: "4px solid #ff9f0a" }}>
+                  This application already has a final decision — documents are locked.
+                  Pick an in-flight application or <Link href="/applicant">create a new draft</Link>.
+                </div>
+              )}
+              {selected && !selectedDecided && (
                 <div className="mt-2" style={{ fontSize: ".76rem", color: "#6d6d6d" }}>
                   {selected.approval_name} · {selected.documents?.length || 0} document(s) uploaded so far
                 </div>
@@ -185,6 +217,9 @@ export default function UploadCentre() {
         </Col>
         {/* ── Scan result / empty state ── */}
         <Col lg={7}>
+          {selected && !selectedDecided && (
+            <DocReadinessCard app={selected} docs={detail?.application?.documents || selected?.documents || []} />
+          )}
           {result ? (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               <Card className="stat-card mb-3"><Card.Body>
@@ -242,6 +277,72 @@ export default function UploadCentre() {
         </Col>
       </Row>
     </Container>
+  );
+}
+
+function DocReadinessCard({ app, docs }: { app: any; docs: any[] }) {
+  const list = docs || [];
+  const passed = list.reduce((s: number, d: any) => s + (d.checks_passed || 0), 0);
+  const total = list.reduce((s: number, d: any) => s + (d.checks_total || 0), 0);
+  const pct = total ? Math.round((100 * passed) / total) : 0;
+  const allPre = list.length > 0 && list.every((d: any) => d.status === "pre_validated");
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+      <Card className="stat-card mb-3"><Card.Body>
+        <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <span className="kicker">Document readiness · live</span>
+            <h5 className="fw-bolder mb-0 mt-1">{app.approval_code} · {list.length} document(s) uploaded</h5>
+          </div>
+          <Badge className="mono" style={allPre
+            ? { background: "#000", color: "#fff", fontSize: ".66rem", letterSpacing: ".1em", padding: "4px 10px" }
+            : { background: "transparent", color: "#000", border: "1.5px solid #ff9f0a", fontSize: ".66rem", letterSpacing: ".1em", padding: "4px 10px" }}>
+            {allPre ? "ALL PRE-VALIDATED ✓" : pct + "% CHECKS PASSED"}
+          </Badge>
+        </div>
+        <ProgressBar now={pct} className="my-3" style={{ height: 8 }} />
+        {list.length === 0 ? (
+          <p style={{ color: "#6d6d6d", fontSize: ".8rem", marginBottom: 0 }}>
+            No documents uploaded for this application yet. Every document you scan here is
+            pre-validated instantly and its readiness shows up in this panel — the same results
+            the officer sees during review.
+          </p>
+        ) : (
+          <div className="table-modern-wrap" style={{ overflowX: "auto" }}>
+            <table className="table-modern" style={{ minWidth: 420 }}>
+              <thead><tr><th>Document</th><th className="text-end">Checks</th><th className="text-end">Status</th></tr></thead>
+              <tbody>
+                {list.map((d: any) => (
+                  <tr key={d.id}>
+                    <td>
+                      <div className="fw-bold" style={{ fontSize: ".8rem" }}>{d.label || d.type}</div>
+                      <span className="mono" style={{ fontSize: ".68rem", color: "#6d6d6d" }}>
+                        {(d.filename || "").slice(0, 28)}{d.uploaded_at ? " · " + String(d.uploaded_at).slice(0, 16).replace("T", " ") : ""}
+                      </span>
+                    </td>
+                    <td className="text-end mono fw-bold" style={{
+                      fontSize: ".78rem",
+                      color: d.checks_passed === d.checks_total ? "#0a0" : "#ff3b30",
+                    }}>{d.checks_passed}/{d.checks_total}</td>
+                    <td className="text-end">
+                      <Badge style={d.status === "pre_validated"
+                        ? { background: "#000", color: "#fff", fontSize: ".6rem", letterSpacing: ".08em" }
+                        : { background: "transparent", color: "#000", border: "1.5px solid #ff9f0a", fontSize: ".6rem", letterSpacing: ".08em" }}>
+                        {String(d.status || "pending").replace(/_/g, " ").toUpperCase()}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="chart-note mt-2">
+          Pre-validated documents travel with the submitted form to the officer portal —
+          the officer then verifies each document one by one before final clearance.
+        </div>
+      </Card.Body></Card>
+    </motion.div>
   );
 }
 

@@ -1,0 +1,80 @@
+{
+  "sector": "electronics",
+  "label": "Electronics System Design & Manufacturing (ESDM)",
+  "approvals": [
+    {
+      "id": "el_udyam",
+      "code": "UDYAM",
+      "name": "Udyam (MSME) Registration",
+      "department": "Ministry of MSME",
+      "description": "National MSME registration enabling scheme eligibility.",
+      "sla_days": 3,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["pan_card", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "el_ewaste",
+      "code": "E-WASTE-EPR",
+      "name": "E-Waste Management Authorization (EPR + Ro-HS)",
+      "department": "Maharashtra Pollution Control Board / CPC-B",
+      "description": "Extended Producer Responsibility authorization with Ro-HS compliance for electronics assembly.",
+      "sla_days": 30,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["pan_card", "gst_certificate", "ewaste_auth"]
+    },
+    {
+      "id": "el_cleanroom",
+      "code": "ISO-CLEANROOM",
+      "name": "Cleanroom ISO Class Validation",
+      "department": "National Accreditation Board for Testing (NABL)",
+      "description": "Air particulate and microbial audit certifying cleanroom fabrication zones.",
+      "sla_days": 25,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "employee_count", "op": "gte", "value": 30},
+      "required_documents": ["cleanroom_cert", "factory_layout", "self_declaration"]
+    },
+    {
+      "id": "el_hazchem",
+      "code": "HAZCHEM-NOC",
+      "name": "Hazardous Chemical Storage NOC",
+      "department": "Maharashtra Pollution Control Board",
+      "description": "Storage authorization for etching acids and silane/phosphine gas banks.",
+      "sla_days": 30,
+      "parallel_group": "C",
+      "dependency_ids": ["ISO-CLEANROOM"],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 5000000},
+      "required_documents": ["factory_layout", "fire_noc", "self_declaration"]
+    },
+    {
+      "id": "el_stpi",
+      "code": "STPI-BOND",
+      "name": "STPI / Customs Bonded Warehouse License",
+      "department": "Software Technology Parks of India (STPI)",
+      "description": "Bonded assembly licence for duty-free import of PCB s and wafer dies.",
+      "sla_days": 25,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["gst_certificate", "lease_deed", "self_declaration"]
+    },
+    {
+      "id": "el_fire",
+      "code": "FIRE-NOC",
+      "name": "Fire Safety NOC",
+      "department": "Maharashtra Fire Services",
+      "description": "No-objection certificate for fire safety compliance.",
+      "sla_days": 14,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["factory_layout", "fire_noc"]
+    }
+  ]
+}

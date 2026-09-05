@@ -2,12 +2,15 @@
 AI-drafted clarifications (edit-before-send), inspection scheduling."""
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..models.schemas import DecisionRequest, InspectionRequest, SignParameterRequest
+from ..models.schemas import DecisionRequest, InspectionRequest, SignParameterRequest, CertificateRequest
 from .. import db, config
 from ..core.ai_service import draft_clarification, pre_scrutiny_summary
 from ..core.readiness import sla_status
 from ..core import green_channel
 from .deps import require_roles, audit, notify
+
+import time
+import hashlib
 
 router = APIRouter(prefix="/officer", tags=["officer"])
 
@@ -31,6 +34,9 @@ def _app_ctx(app_row: dict) -> dict:
     approval = db.query_one("SELECT * FROM approvals WHERE id=?", (app_row["approval_id"],))
     profile = db.query_one("SELECT * FROM business_profiles WHERE id=?",
                            (app_row["business_id"],))
+    cert = db.query_one(
+        "SELECT certificate_no, type AS certificate_type, issued_at FROM certificates WHERE application_id=?",
+        (app_row["id"],))
     return {
         "application": dict(app_row),
         "approval_name": approval["name"] if approval else "",
@@ -38,6 +44,7 @@ def _app_ctx(app_row: dict) -> dict:
         "business_name": profile["name"] if profile else "",
         "readiness_score": app_row["readiness_score"],
         "documents": _app_docs(app_row["id"]),
+        "certificate": dict(cert) if cert else None,
     }
 
 
@@ -306,6 +313,33 @@ def draft_clarification_endpoint(application_id: str,
     })
 
 
+@router.post("/applications/{application_id}/draft-sendback")
+def draft_sendback_endpoint(application_id: str,
+                            user: dict = Depends(require_roles("officer", "admin"))):
+    """AI-assisted summary of what the applicant must fix before resubmitting.
+    Used as a starter text for the 'Send back' action — officer reviews & edits."""
+    app_row = _app_or_404(application_id)
+    ctx = _app_ctx(app_row)
+    issues = []
+    for doc in ctx["documents"]:
+        for flag in doc.get("validation_flags", []):
+            if not flag.get("passed", False):
+                issues.append("{} — check '{}': {}".format(
+                    doc.get("label") or doc.get("type"),
+                    flag.get("check_id"), flag.get("reason", "")))
+    profile = db.query_one(
+        "SELECT sector, investment_size, employee_count, project_stage FROM "
+        "business_profiles WHERE id=?", (app_row["business_id"],))
+    if not issues:
+        issues.append("Officer-specified items (no failing automated checks).")
+    return draft_clarification({
+        "approval_name": ctx["approval_name"], "issues": issues[:10],
+        "business_name": ctx["business_name"], "application_id": application_id,
+        "action": "send_back",
+        "profile": profile,
+    })
+
+
 @router.post("/applications/{application_id}/decision")
 def decision(application_id: str, body: DecisionRequest,
              user: dict = Depends(require_roles("officer", "admin"))):
@@ -351,6 +385,25 @@ def decision(application_id: str, body: DecisionRequest,
                 "ai_separation": {"ai_drafted_text": body.notes or "",
                                   "final_text": final_text}}
 
+        # Send back — officer identifies issues, returns for corrections (AI-drafted).
+    if body.action == "send_back":
+        if not body.notes.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Provide notes describing the corrections needed.")
+        db.execute(
+            "UPDATE applications SET status='returned', feedback=?, "
+            "assigned_officer_id=? WHERE id=?",
+            (body.notes.strip(), user["id"], application_id))
+        audit("application", application_id, user, "send_back", body.notes.strip(),
+              {"action": "send_back"})
+        if profile:
+            notify(profile["owner_id"], "Application Returned for Corrections",
+                   body.notes.strip()[:300], application_id=application_id,
+                   sms_body="Application {} returned for corrections.".format(
+                       application_id[-8:]))
+        return {"status": "returned", "decision_source": "human"}
+
     # Approve / Reject — ALWAYS officer-initiated (FR-18).
     if body.action == "approve":
         open_req = db.query_one(
@@ -380,13 +433,22 @@ def decision(application_id: str, body: DecisionRequest,
     audit("application", application_id, user,
           "approve" if body.action == "approve" else "reject",
           body.notes or "(no notes)", {"action": body.action})
+    sanction_letter = None
+    if body.action == "approve":
+        # Final approval instantly generates the sanction letter, which appears
+        # in the applicant's Application panel below the form PDF.
+        final_row = _app_or_404(application_id)
+        sanction_letter = _issue_sanction_letter(final_row, user["id"])
     if profile:
         notify(profile["owner_id"],
                "Application {}".format(new_status.replace("_", " ").title()),
                body.notes or "Decision recorded.", application_id=application_id,
                sms_body="Application {} status: {}.".format(
                    application_id[-8:], new_status.replace("_", " ")))
-    return {"status": new_status, "decision_source": "human"}
+    result = {"status": new_status, "decision_source": "human"}
+    if body.action == "approve" and sanction_letter:
+        result["sanction_letter"] = sanction_letter
+    return result
 
 
 @router.post("/applications/{application_id}/schedule-inspection")
@@ -409,5 +471,119 @@ def schedule_inspection(application_id: str, body: InspectionRequest,
 def green_channel_status(user: dict = Depends(require_roles("officer", "admin"))):
     return {"enabled": green_channel.green_channel_enabled(),
             "rate_limit_per_day": config.GC_RATE_LIMIT_PER_DAY}
+
+
+def _issue_sanction_letter(app_row: dict, officer_id: str,
+                           certificate_type: str = "sanction_clearance") -> dict:
+    """Generate and persist the sanction letter for an approved application.
+    Idempotent: returns the existing letter if one was already issued."""
+    existing = db.query_one(
+        "SELECT id, certificate_no FROM certificates WHERE application_id=?",
+        (app_row["id"],))
+    if existing:
+        return {"certificate_id": existing["id"],
+                "certificate_no": existing["certificate_no"],
+                "certificate_type": certificate_type,
+                "already_issued": True}
+    ctx = _app_ctx(app_row)
+    from ..core import form_pdf
+    ctx["certificate_type"] = certificate_type
+    pdf_bytes = form_pdf.build_sanction_certificate(ctx)
+    cert_id = db.new_id("cert")
+    cert_no = "INDUS-SANCTION-{}".format(int(time.time()))
+    sha256 = hashlib.sha256(pdf_bytes).hexdigest()
+    db.execute(
+        "INSERT INTO certificates (id, application_id, business_id, certificate_no, "
+        "type, issued_at, issuing_officer_id, verification_hash, form_data) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (cert_id, app_row["id"], app_row["business_id"], cert_no,
+         certificate_type, db._now(), officer_id, sha256,
+         db.jdumps({
+             "applicant_name": ctx["business_name"],
+             "approval_name": ctx["approval_name"],
+             "approval_code": ctx["approval_code"],
+             "sha256": sha256,
+             "certificate_no": cert_no,
+         })))
+    audit("certificate", cert_id, {"id": officer_id}, "issue",
+          "Sanction letter generated for application {}.",
+          {"application_id": app_row["id"], "type": certificate_type})
+    profile = db.query_one(
+        "SELECT owner_id FROM business_profiles WHERE id=?",
+        (app_row["business_id"],))
+    if profile:
+        notify(profile["owner_id"], "Sanction Letter Issued",
+               "Your sanctioned clearance letter is ready — download it from "
+               "your Application panel.",
+               application_id=app_row["id"],
+               sms_body="Sanction letter issued. Download from your portal.")
+    return {"certificate_id": cert_id, "certificate_no": cert_no,
+            "certificate_type": certificate_type}
+
+
+@router.post("/applications/{application_id}/issue-certificate")
+def issue_certificate(application_id: str,
+                      body: CertificateRequest,
+                      user: dict = Depends(require_roles("officer", "admin"))):
+    """Officer issues the sanction letter after final approval (idempotent)."""
+    app_row = _app_or_404(application_id)
+    if app_row["status"] != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail="Application must be approved before the sanction letter "
+                   "can be generated.")
+    result = _issue_sanction_letter(app_row, user["id"], body.certificate_type)
+    return result
+
+
+@router.get("/applications/{application_id}/certificate")
+def download_certificate(application_id: str,
+                          user: dict = Depends(require_roles("officer", "admin"))):
+    """Officer downloads the sanction certificate PDF."""
+    cert = db.query_one(
+        "SELECT c.* FROM certificates c WHERE c.application_id=?",
+        (application_id,))
+    if cert is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No certificate has been issued for this application.")
+    app_row = _app_or_404(application_id)
+    ctx = _app_ctx(app_row)
+    from ..core import form_pdf
+    form_data = db.jloads(cert["form_data"], {})
+    ctx.update({
+        "certificate_no": cert["certificate_no"],
+        "certificate_type": cert["type"],
+        "issued_at": cert["issued_at"],
+        "issued_by": cert["issuing_officer_id"],
+    })
+    pdf_bytes = form_pdf.build_sanction_certificate(ctx)
+    from fastapi.responses import StreamingResponse
+    import io
+    buf = io.BytesIO(pdf_bytes)
+    headers = {
+        "Content-Disposition": 'inline; filename="INDUS_ROUTE_SANCTION_CERTIFICATE_{}.pdf"'.format(
+            cert["certificate_no"])
+    }
+    return StreamingResponse(buf, media_type="application/pdf", headers=headers)
+
+
+@router.get("/certificates/verify/{certificate_no}")
+def verify_certificate(certificate_no: str):
+    """Verify a sanction certificate's authenticity (public, no PII)."""
+    cert = db.query_one(
+        "SELECT c.certificate_no, c.type AS certificate_type, c.issued_at, "
+        "c.verification_hash FROM certificates c WHERE c.certificate_no=?",
+        (certificate_no.strip(),))
+    if cert is None:
+        return {"valid": False, "note": "No certificate found for this number."}
+    return {
+        "valid": True,
+        "certificate_no": cert["certificate_no"],
+        "certificate_type": cert["certificate_type"],
+        "issued_at": cert["issued_at"],
+        "sha256_prefix": cert["verification_hash"][:16],
+        "note": "Verify PDF integrity hash matches the value recorded at issuance."
+    }
 
 

@@ -87,6 +87,57 @@
       "green_channel_eligible": true,
       "condition": {"field": "employee_count", "op": "gte", "value": 5},
       "required_documents": ["pan_card", "self_declaration"]
+    },
+    {
+      "id": "ph_peso_tank",
+      "code": "PESO-TANKFARM",
+      "name": "PESO Bulk Solvent Tank Farm License",
+      "department": "Petroleum & Explosives Safety Organisation",
+      "description": "Licence under the Petroleum Rules for bulk solvent tank farms and API reaction vessels.",
+      "sla_days": 40,
+      "parallel_group": "C",
+      "dependency_ids": ["MPCB-CTE"],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 20000000},
+      "required_documents": ["lease_deed", "peso_storage_license", "self_declaration"]
+    },
+    {
+      "id": "ph_eia",
+      "code": "EC-SEIAA",
+      "name": "Environmental Clearance (SEIAA / MoEF&CC 5f)",
+      "department": "State Environment Impact Assessment Authority",
+      "description": "EC under Category 5(f) for synthetic organic chemicals and bulk drug manufacturing.",
+      "sla_days": 60,
+      "parallel_group": "C",
+      "dependency_ids": ["MPCB-CTE"],
+      "green_channel_eligible": false,
+      "required_documents": ["environmental_clearance", "lease_deed"]
+    },
+    {
+      "id": "ph_cgwa",
+      "code": "CGWA-WATER-NOC",
+      "name": "CGWA / State Water NOC (Injection-grade water)",
+      "department": "Central Ground Water Authority",
+      "description": "Quantitative daily extraction quota permit for pure injection-grade water.",
+      "sla_days": 35,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "employee_count", "op": "gte", "value": 50},
+      "required_documents": ["water_noc", "lease_deed"]
+    },
+    {
+      "id": "ph_narcotics",
+      "code": "NARCOTICS-NOC",
+      "name": "Narcotics Commissioner NOC (Precursor handling)",
+      "department": "Narcotics Control Bureau",
+      "description": "Dual clearance for handling controlled precursor chemicals such as ephedrine.",
+      "sla_days": 45,
+      "parallel_group": "C",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 10000000},
+      "required_documents": ["gst_certificate", "self_declaration"]
     }
   ]
 }

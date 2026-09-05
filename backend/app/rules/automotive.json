@@ -76,6 +76,58 @@
       "green_channel_eligible": false,
       "condition": {"field": "employee_count", "op": "gte", "value": 20},
       "required_documents": ["pan_card", "lease_deed", "self_declaration"]
+    },
+    {
+      "id": "au_boiler",
+      "code": "BOILER-INSP",
+      "name": "Directorate of Steam Boilers Inspection Clearance",
+      "department": "Directorate of Steam Boilers, Maharashtra",
+      "description": "Approval of high-pressure boiler drawings, steam piping layouts and hydraulic pressure test certificates.",
+      "sla_days": 30,
+      "parallel_group": "C",
+      "dependency_ids": ["FACTORY-PLAN"],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 3000000},
+      "required_documents": ["boiler_certificate", "factory_layout"]
+    },
+    {
+      "id": "au_crane",
+      "code": "DISSH-CRANE-11",
+      "name": "DISSH Heavy Crane & Lifting Tackles Certification (Form 11)",
+      "department": "Directorate of Industrial Safety & Health",
+      "description": "Certificate of fitness for overhead gantry cranes, hoists and stamping press pits.",
+      "sla_days": 25,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "employee_count", "op": "gte", "value": 40},
+      "required_documents": ["crane_cert", "factory_layout"]
+    },
+    {
+      "id": "au_electrical",
+      "code": "ELEC-INSP-FORMA",
+      "name": "Electrical Inspectorate Safety Certificate (Form A)",
+      "department": "Chief Electrical Inspector, Maharashtra",
+      "description": "Form A clearance for substations over 650V, captive transformers and HV bus-ducts.",
+      "sla_days": 25,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 5000000},
+      "required_documents": ["electrical_certificate", "factory_layout"]
+    },
+    {
+      "id": "au_paintshop",
+      "code": "VOC-PAINTSHOP",
+      "name": "Paint Shop & VOC Emission Consent",
+      "department": "Maharashtra Pollution Control Board",
+      "description": "Stack-height authorization and VOC scrubbers for automated paint bake ovens.",
+      "sla_days": 30,
+      "parallel_group": "C",
+      "dependency_ids": ["MPCB-CTE"],
+      "green_channel_eligible": false,
+      "condition": {"field": "employee_count", "op": "gte", "value": 15},
+      "required_documents": ["effluent_zld", "self_declaration"]
     }
   ]
 }

@@ -1,0 +1,80 @@
+{
+  "sector": "logistics",
+  "label": "Logistics, Warehousing & Cold Chain",
+  "approvals": [
+    {
+      "id": "lg_udyam",
+      "code": "UDYAM",
+      "name": "Udyam (MSME) Registration",
+      "department": "Ministry of MSME",
+      "description": "National MSME registration enabling scheme eligibility.",
+      "sla_days": 3,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["pan_card", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "lg_fire_nfpa",
+      "code": "FIRE-NFPA13",
+      "name": "Multi-Modal Hub Fire Clearance (NFPA 13)",
+      "department": "Maharashtra Fire Services",
+      "description": "In-rack automated sprinkler and high-rack storage clearance for warehouses.",
+      "sla_days": 30,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["factory_layout", "fire_noc"]
+    },
+    {
+      "id": "lg_peso_dg",
+      "code": "PESO-DG-FUEL",
+      "name": "PESO Diesel Fuel Yard Sanction (Form XIII)",
+      "department": "Petroleum & Explosives Safety Organisation",
+      "description": "Bulk diesel storage licence for onsite multi-megawatt backup generator yards.",
+      "sla_days": 45,
+      "parallel_group": "C",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "condition": {"field": "investment_size", "op": "gte", "value": 2000000},
+      "required_documents": ["lease_deed", "peso_storage_license", "self_declaration"]
+    },
+    {
+      "id": "lg_metrology",
+      "code": "METROLOGY-PACK",
+      "name": "Legal Metrology Packing License (Rule 27)",
+      "department": "Legal Metrology, Govt of Maharashtra",
+      "description": "Verification and registration for automated sorting and barcoding of packaged commodities.",
+      "sla_days": 15,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["pan_card", "gst_certificate", "self_declaration"]
+    },
+    {
+      "id": "lg_fssai_cold",
+      "code": "FSSAI-COLD",
+      "name": "FSSAI Cold Storage License",
+      "department": "Food Safety & Standards Authority of India",
+      "description": "Cold-chain temperature logging validation for perishable foodstuffs or vaccines.",
+      "sla_days": 21,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["lease_deed", "self_declaration"]
+    },
+    {
+      "id": "lg_shop_est",
+      "code": "SHOP-EST",
+      "name": "Shop & Establishment Registration",
+      "department": "Labour Department",
+      "description": "Required for establishments with commercial activity.",
+      "sla_days": 10,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "condition": {"field": "employee_count", "op": "gte", "value": 5},
+      "required_documents": ["pan_card", "self_declaration"]
+    }
+  ]
+}

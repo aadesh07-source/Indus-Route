@@ -1,0 +1,67 @@
+{
+  "sector": "distillery",
+  "label": "Distilleries, Breweries & Agro-Biomass",
+  "approvals": [
+    {
+      "id": "dl_excise",
+      "code": "EXCISE-D1",
+      "name": "State Excise Distillery / Brewery License (D-1 / B-1)",
+      "department": "Maharashtra State Excise",
+      "description": "Distillery or brewery licence for grain / molasses spirit distillation.",
+      "sla_days": 45,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["lease_deed", "excise_license", "self_declaration"]
+    },
+    {
+      "id": "dl_zld",
+      "code": "ZLD-OCEMS",
+      "name": "Zero Liquid Discharge Continuous Monitoring (OCEMS)",
+      "department": "Maharashtra Pollution Control Board",
+      "description": "OCEMS link to MPC-B servers for spent wash, incinerator boilers and bio-methanation digesters.",
+      "sla_days": 30,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["gst_certificate", "effluent_zld"]
+    },
+    {
+      "id": "dl_water",
+      "code": "GROUNDWATER-NOC",
+      "name": "Groundwater Abstraction Clearance",
+      "department": "State Ground Water Authority",
+      "description": "Recharge-to-discharge ratio compliance certification for abstraction wells.",
+      "sla_days": 35,
+      "parallel_group": "B",
+      "dependency_ids": [],
+      "green_channel_eligible": false,
+      "required_documents": ["lease_deed", "water_noc"]
+    },
+    {
+      "id": "dl_biomass",
+      "code": "BIOMASS-NOC",
+      "name": "Biomass Fuel Storage NOC",
+      "department": "Maharashtra Fire Services",
+      "description": "Fire separation buffer clearance for bagasse, paddy husk or wood chip yards.",
+      "sla_days": 20,
+      "parallel_group": "C",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "required_documents": ["factory_layout", "fire_noc", "self_declaration"]
+    },
+    {
+      "id": "dl_shop_est",
+      "code": "SHOP-EST",
+      "name": "Shop & Establishment Registration",
+      "department": "Labour Department",
+      "description": "Required for establishments with commercial activity.",
+      "sla_days": 10,
+      "parallel_group": "A",
+      "dependency_ids": [],
+      "green_channel_eligible": true,
+      "condition": {"field": "employee_count", "op": "gte", "value": 5},
+      "required_documents": ["pan_card", "self_declaration"]
+    }
+  ]
+}

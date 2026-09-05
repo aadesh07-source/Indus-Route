@@ -62,14 +62,26 @@ def _app_view(app_row: dict, with_docs: bool = False) -> dict:
         "readiness_score": app_row["readiness_score"],
         "green_channel": bool(app_row["green_channel"]),
         "provisional_certificate": db.jloads(app_row["provisional_certificate"], None),
+        "feedback": app_row.get("feedback", ""),
+        "selected_schemes": db.jloads(app_row.get("selected_schemes"), []),
         "sla": sla_status(app_row),
         "docs_pending": (docs_stats["n"] == 0 or docs_stats["p"] < docs_stats["t"]),
         "docs_passed": docs_stats["p"], "docs_total": docs_stats["t"],
         "docs_count": docs_stats["n"],
         "created_at": app_row["created_at"],
     }
+    cert = db.query_one(
+        "SELECT certificate_no, type AS certificate_type, issued_at FROM certificates "
+        "WHERE application_id=?", (app_row["id"],))
+    view["certificate"] = dict(cert) if cert else None
     if with_docs:
         view["documents"] = _app_documents(app_row["id"])
+        view["clarifications"] = db.query(
+            "SELECT * FROM clarification_requests WHERE application_id=? ORDER BY created_at",
+            (app_row["id"],))
+        view["schemes_selected"] = db.query(
+            "SELECT scheme_id, selected_at FROM application_schemes "
+            "WHERE application_id=? ORDER BY selected_at", (app_row["id"],))
     return view
 
 
@@ -77,11 +89,19 @@ def _app_view(app_row: dict, with_docs: bool = False) -> dict:
 def create_application(body: CreateApplicationRequest,
                        user: dict = Depends(get_current_user)):
     profile = get_own_profile(user)
-    approval = db.query_one("SELECT * FROM approvals WHERE id=? OR code=?",
-                            (body.approval_id, body.approval_id))
+    # Look up the approval within the applicant's own sector — this avoids
+    # ambiguity when the same approval code exists in multiple sector rule tables.
+    approval = db.query_one(
+        "SELECT * FROM approvals WHERE (id=? OR code=?) AND sector=?",
+        (body.approval_id, body.approval_id, profile["sector"]))
     if approval is None:
-        raise HTTPException(status_code=404,
-                            detail="Unknown approval '{}'.".format(body.approval_id))
+        valid = db.query(
+            "SELECT code FROM approvals WHERE sector=? ORDER BY code", (profile["sector"],))
+        codes = ", ".join(r["code"] for r in valid)
+        raise HTTPException(
+            status_code=404,
+            detail="Unknown approval '{}' for sector '{}'. Valid approvals: {}".format(
+                body.approval_id, profile["sector"], codes or "(none)"))
     if approval["sector"] != profile["sector"]:
         raise HTTPException(
             status_code=422,
@@ -118,10 +138,33 @@ def my_applications(user: dict = Depends(get_current_user)):
             "(SELECT COALESCE(SUM(d.checks_total),0) FROM documents d WHERE d.application_id=a.id) AS docs_total "
             "FROM applications a JOIN approvals ap ON a.approval_id=ap.id "
             "WHERE a.business_id=? ORDER BY a.created_at DESC", (profile["id"],))
+    if not rows:
+        return {"applications": []}
+    app_ids = [r["id"] for r in rows]
+    doc_counts = db.query(
+        "SELECT application_id, COUNT(*) AS docs_count, "
+        "COALESCE(SUM(checks_passed),0) AS docs_passed, "
+        "COALESCE(SUM(checks_total),0) AS docs_total FROM documents "
+        "WHERE application_id IN ({}) GROUP BY application_id".format(
+            ",".join("?" * len(app_ids))), app_ids) if rows else []
+    cert_rows = db.query(
+        "SELECT application_id, certificate_no, type AS certificate_type, issued_at "
+        "FROM certificates WHERE application_id IN ({})".format(
+            ",".join("?" * len(app_ids))), app_ids) if rows else []
+    certs_by_app = {r["application_id"]: r for r in cert_rows}
+    docs_by_app = {r["application_id"]: r for r in doc_counts}
     out = []
     for r in rows:
         d = dict(r)
-        d["docs_pending"] = (r["docs_count"] == 0 or r["docs_passed"] < r["docs_total"])
+        dc = docs_by_app.get(r["id"], {})
+        d["docs_count"] = dc.get("docs_count", 0)
+        d["docs_passed"] = dc.get("docs_passed", 0)
+        d["docs_total"] = dc.get("docs_total", 0)
+        d["docs_pending"] = (d["docs_count"] == 0 or d["docs_passed"] < d["docs_total"])
+        cert = certs_by_app.get(r["id"])
+        d["certificate"] = dict(cert) if cert else None
+        d["feedback"] = r.get("feedback", "")
+        d["selected_schemes"] = db.jloads(r.get("selected_schemes"), [])
         out.append(d)
     return {"applications": out}
 
@@ -131,14 +174,10 @@ def get_application(application_id: str, user: dict = Depends(get_current_user))
     app_row = _load_application(application_id)
     _assert_can_view(app_row, user)
     view = _app_view(app_row, with_docs=True)
-    clarifications = db.query(
-        "SELECT * FROM clarification_requests WHERE application_id=? ORDER BY created_at",
-        (application_id,))
     inspections = db.query(
         "SELECT * FROM inspections WHERE application_id=? ORDER BY created_at",
         (application_id,))
-    return {"application": view, "clarifications": clarifications,
-            "inspections": inspections}
+    return {"application": view, "inspections": inspections}
 
 
 @router.get("/applications/{application_id}/readiness")
@@ -219,11 +258,16 @@ def _perform_submit(app_row: dict, user: dict, source: str) -> dict:
 def submit_application(application_id: str, user: dict = Depends(get_current_user)):
     app_row = _load_application(application_id)
     _assert_can_view(app_row, user)
-    if app_row["status"] not in ("draft", "clarification_pending"):
+    if app_row["status"] not in ("draft", "clarification_pending", "returned"):
         raise HTTPException(
             status_code=409,
             detail="Application cannot be submitted from status '{}'.".format(
                 app_row["status"]))
+    if app_row["status"] == "returned":
+        db.execute(
+            "UPDATE applications SET status='draft', feedback='' WHERE id=?",
+            (application_id,))
+        app_row = _load_application(application_id)
     return _perform_submit(app_row, user, "manual submission")
 
 
@@ -239,6 +283,14 @@ def _build_and_store_form(app_row: dict, user: dict) -> dict:
     kyc = digilocker.latest_verified(profile["owner_id"])
     applicant = db.query_one("SELECT name FROM users WHERE id=?",
                              (profile["owner_id"],))
+    selected_scheme_ids = db.jloads(app_row.get("selected_schemes"), [])
+    schemes_ctx = []
+    if selected_scheme_ids:
+        placeholders = ",".join("?" * len(selected_scheme_ids))
+        rows = db.query(
+            "SELECT id, name, description, benefits FROM schemes "
+            "WHERE id IN ({})".format(placeholders), selected_scheme_ids)
+        schemes_ctx = [dict(r) for r in rows]
 
     identity = form_pdf.new_form_identity(app_row["id"], app_row["business_id"])
     pdf_bytes = form_pdf.build_application_pdf({
@@ -248,6 +300,7 @@ def _build_and_store_form(app_row: dict, user: dict) -> dict:
         "sha256": identity["sha256"],
         "profile": profile, "approval": approval, "checklist": checklist,
         "documents": documents, "kyc": kyc,
+        "selected_schemes": schemes_ctx,
         "applicant_name": applicant["name"] if applicant else "",
     })
 
@@ -369,6 +422,33 @@ def my_grievances(user: dict = Depends(get_current_user)):
 def scheme_recommendations(user: dict = Depends(get_current_user)):
     from ..core.rule_engine import _eval_condition
 
+    SECTOR_CATEGORY = {
+        "food_processing": "Agro & Food Processing",
+        "textiles": "Textiles, Apparel & Technical Textiles",
+        "chemicals": "Chemicals & Industrial Safety",
+        "distillery": "Distilleries & Breweries",
+        "pharma": "Pharmaceuticals, APIs & Medical Devices",
+        "automotive": "Automobile, EV & Heavy Engineering",
+        "electronics": "Electronics System Design & Manufacturing (ESDM)",
+        "logistics": "Logistics, Warehousing & Cold Chain",
+        "energy": "Renewable Energy, Biofuels & Green Manufacturing",
+    }
+    UNIVERSAL = "Universal Baseline — PSI / MIISP Package of Incentives"
+    UNIVERSAL_IDS = {"psi_ips", "psi_stamp", "psi_interest", "psi_power",
+                     "sch_msme", "sch_mega"}
+
+    def _category(scheme_id: str, conds) -> str:
+        if scheme_id in UNIVERSAL_IDS:
+            return UNIVERSAL
+        for c in conds:
+            if c.get("field") == "sector":
+                vals = c.get("value")
+                vals = vals if isinstance(vals, list) else [vals]
+                if vals:
+                    return SECTOR_CATEGORY.get(
+                        str(vals[0]), str(vals[0]).replace("_", " ").title())
+        return UNIVERSAL
+
     profile = get_own_profile(user)
     p = load_profile_dict(profile)
     schemes = db.query("SELECT * FROM schemes")
@@ -380,14 +460,17 @@ def scheme_recommendations(user: dict = Depends(get_current_user)):
             if not _eval_condition(cond, p):
                 reasons.append("Field '{}' did not meet the condition.".format(
                     cond.get("field")))
+        category = _category(scheme["id"], conditions)
         if not reasons:
             eligible.append({"id": scheme["id"], "name": scheme["name"],
                              "description": scheme["description"],
                              "benefits": scheme["benefits"],
+                             "category": category,
                              "explanation": "All eligibility rules matched your profile."})
         else:
             others.append({"id": scheme["id"], "name": scheme["name"],
-                           "eligible": False, "explanation": "; ".join(reasons)})
+                           "eligible": False, "category": category,
+                           "explanation": "; ".join(reasons)})
     return {"eligible": eligible, "others": others,
             "note": "Rule-based eligibility only — advisory, not a scheme guarantee."}
 
@@ -412,11 +495,16 @@ def submit_with_form(application_id: str, user: dict = Depends(get_current_user)
     """Submit using the auto-generated form -> instant dispatch to officers."""
     app_row = _load_application(application_id)
     _assert_can_view(app_row, user)
-    if app_row["status"] not in ("draft", "clarification_pending"):
+    if app_row["status"] not in ("draft", "clarification_pending", "returned"):
         raise HTTPException(
             status_code=409,
             detail="Application cannot be submitted from status '{}'.".format(
                 app_row["status"]))
+    if app_row["status"] == "returned":
+        db.execute(
+            "UPDATE applications SET status='draft', feedback='' WHERE id=?",
+            (application_id,))
+        app_row = _load_application(application_id)
     form = db.query_one(
         "SELECT id, verification_code FROM generated_forms WHERE application_id=? "
         "ORDER BY generated_at DESC LIMIT 1", (application_id,))
@@ -448,3 +536,148 @@ def verify_form(verification_code: str):
             "sha256_prefix": form["sha256"][:16],
             "note": ("Cryptographically bound to its generation time; any edit "
                      "to the PDF invalidates the recorded hash.")}
+
+
+@router.post("/applications/{application_id}/schemes")
+def update_selected_schemes(application_id: str, body: dict,
+                            user: dict = Depends(get_current_user)):
+    """Persist the applicant's scheme selections for this application."""
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    if app_row["status"] not in ("draft", "clarification_pending", "returned"):
+        raise HTTPException(
+            status_code=409,
+            detail="Schemes can only be edited while the application is in "
+                   "draft/clarification/returned status (current: '{}').".format(
+                       app_row["status"]))
+    scheme_ids = body.get("scheme_ids") or []
+    if not isinstance(scheme_ids, list):
+        raise HTTPException(status_code=422, detail="scheme_ids must be a list.")
+    valid = {r["id"] for r in db.query("SELECT id FROM schemes")}
+    scheme_ids = [s for s in scheme_ids if s in valid]
+    db.execute("DELETE FROM application_schemes WHERE application_id=?",
+               (application_id,))
+    if scheme_ids:
+        db.executemany(
+            "INSERT INTO application_schemes (id, application_id, scheme_id, "
+            "selected_at) VALUES (?,?,?,?)",
+            [(db.new_id("aps"), application_id, s, db._now()) for s in scheme_ids])
+    db.execute("UPDATE applications SET selected_schemes=? WHERE id=?",
+               (db.jdumps(scheme_ids), application_id))
+    audit("application", application_id, user, "schemes_selected",
+          "{} scheme(s) selected.".format(len(scheme_ids)),
+          {"scheme_ids": scheme_ids})
+    return {"selected_schemes": scheme_ids, "count": len(scheme_ids)}
+
+
+@router.post("/applications/{application_id}/resubmit")
+def resubmit_application(application_id: str, body: dict = None,
+                          user: dict = Depends(get_current_user)):
+    """Flip a 'returned' application back to draft and submit it again."""
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    if app_row["status"] != "returned":
+        raise HTTPException(
+            status_code=409,
+            detail="Only applications in 'returned' status can be resubmitted "
+                   "(current: '{}').".format(app_row["status"]))
+    db.execute(
+        "UPDATE applications SET status='draft', feedback='', decided_at=NULL "
+        "WHERE id=?", (application_id,))
+    audit("application", application_id, user, "resubmit_after_return",
+          "Applicant re-submitted after officer returned for corrections.")
+    return _perform_submit(_load_application(application_id), user,
+                           "resubmit after return")
+
+
+@router.get("/applications/{application_id}/certificate.pdf")
+def applicant_download_certificate(application_id: str,
+                                   user: dict = Depends(get_current_user)):
+    """Applicant-side download of the sanction clearance certificate."""
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    if app_row["status"] != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail="Certificate is only available once the application is "
+                   "approved (current: '{}').".format(app_row["status"]))
+    cert = db.query_one(
+        "SELECT *, type AS certificate_type FROM certificates WHERE application_id=?",
+        (application_id,))
+    if cert is None:
+        raise HTTPException(status_code=404,
+                            detail="No certificate has been issued yet.")
+    from ..core import form_pdf
+    profile = db.query_one("SELECT * FROM business_profiles WHERE id=?",
+                           (app_row["business_id"],))
+    approval = db.query_one("SELECT * FROM approvals WHERE id=?",
+                            (app_row["approval_id"],))
+    applicant = db.query_one("SELECT name FROM users WHERE id=?",
+                             (profile["owner_id"],)) if profile else None
+    cert_ctx = {
+        "app_id": app_row["id"],
+        "application_id": app_row["id"],
+        "business_name": profile["name"] if profile else "",
+        "sector": (profile["sector"] if profile else "").replace("_", " ").title(),
+        "approval_name": approval["name"] if approval else "",
+        "approval_code": approval["code"] if approval else "",
+        "department": approval["department"] if approval else "",
+        "applicant_name": applicant["name"] if applicant else "",
+        "authorized_person": profile["authorized_person"] if profile else "",
+        "location": "{}, {}".format(
+            (profile["district"] or "") if profile else "",
+            (profile["industrial_zone"] or "") if profile else ""),
+        "submitted_at": app_row["submitted_at"] or app_row["created_at"],
+        "approved_at": app_row["decided_at"] or cert["issued_at"],
+        "officer_name": "",
+        "certificate_no": cert["certificate_no"],
+        "certificate_type": cert["certificate_type"],
+        "certificate_code": cert["verification_hash"][:16].upper(),
+        "issued_at": cert["issued_at"],
+        "generated_at": db._now(),
+        "clearances": [
+            "{} - {} (Department: {})".format(
+                approval["code"] if approval else "", approval["name"] if approval else "",
+                approval["department"] if approval else ""),
+        ],
+    }
+    pdf_bytes = form_pdf.build_sanction_certificate(cert_ctx)
+    from fastapi.responses import Response
+    return Response(
+        content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=IndusRoute-SANCTION-{}.pdf".format(
+            cert["certificate_no"])})
+
+
+@router.post("/applications/{application_id}/auto-fill-from-data")
+def auto_fill_from_data(application_id: str,
+                        user: dict = Depends(get_current_user)):
+    """Aggregate every data source (profile + KYC + selected schemes + uploaded
+    documents + checklist approvals) into the auto-generated UAF PDF.
+    Called by the applicant immediately before submitting."""
+    app_row = _load_application(application_id)
+    _assert_can_view(app_row, user)
+    if app_row["status"] not in ("draft", "clarification_pending", "returned"):
+        raise HTTPException(
+            status_code=409,
+            detail="Auto-fill runs only for draft/clarification/returned "
+                   "applications (current: '{}').".format(app_row["status"]))
+    profile = db.query_one("SELECT * FROM business_profiles WHERE id=?",
+                           (app_row["business_id"],))
+    kyc = digilocker.latest_verified(profile["owner_id"]) if profile else {}
+    documents = _app_documents(app_row["id"])
+    checklist = evaluate_profile(load_profile_dict(profile))
+    return {
+        "auto_filled": True,
+        "sources": {
+            "profile_filled": bool(profile and profile.get("name")),
+            "kyc_bound": bool(kyc and kyc.get("kyc_status") in ("verified", "applied")),
+            "documents_uploaded": len(documents),
+            "documents_passing": sum(1 for d in documents
+                                     if d.get("checks_passed") == d.get("checks_total")
+                                     and d.get("checks_total", 0) > 0),
+            "schemes_selected": len(db.jloads(app_row.get("selected_schemes"), [])),
+            "approvals_in_checklist": len(checklist.get("approvals", [])),
+        },
+        "form": _build_and_store_form(app_row, user),
+    }
