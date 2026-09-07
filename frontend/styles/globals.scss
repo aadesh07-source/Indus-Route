@@ -10,10 +10,12 @@
 html { scroll-behavior: smooth; }
 body {
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
 }
-::selection { background: $black; color: $white; }
-.surface-black ::selection { background: $white; color: $black; }
+// Text selection: keep it subtle and always readable so it never
+// paints a solid black bar that hides the letters.
+::selection { background: #cdd2d6; color: inherit; }
+.surface-black ::selection { background: #3a3a3a; color: #ffffff; }
 
 a { text-underline-offset: 3px; }
 
@@ -37,7 +39,8 @@ a { text-underline-offset: 3px; }
 .surface-black .kicker { color: $ink-on-dark; }
 
 // Oversized display hierarchy — beyond Bootstrap's defaults
-.display-6, .display-7, .display-8 { font-weight: $font-weight-bolder; letter-spacing: -0.035em; line-height: 0.95; }
+// (loosened tracking + taller line-height so big glyphs never merge)
+.display-6, .display-7, .display-8 { font-weight: $font-weight-bolder; letter-spacing: -0.01em; line-height: 1.04; }
 .display-6 { font-size: clamp(2.5rem, 6vw, 3.5rem); }
 .display-7 { font-size: clamp(2.1rem, 5vw, 3rem); }
 .display-8 { font-size: clamp(1.8rem, 4.5vw, 2.5rem); }
@@ -52,7 +55,7 @@ a { text-underline-offset: 3px; }
   border-radius: 4px;
   background: var(--btn-bg);
   color: var(--btn-fg);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.8rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -110,9 +113,10 @@ a { text-underline-offset: 3px; }
   --bs-secondary-color: #c9c9c4;
   background: $black;
   color: #fff;
-  a { color: #fff; }
+  a:not(.btn):not(.btn-mono) { color: #fff; }
   .kicker { color: #8f8f8f; }
-  .text-black { color: #000 !important; }
+  // Never let text disappear into the black panel — force white.
+  .text-black { color: #fff !important; }
   .text-muted, .muted { color: #8f8f8f !important; }
   .card, .card-header, .card-footer {
     background: #000;
@@ -184,19 +188,19 @@ a { text-underline-offset: 3px; }
   .hero-content { position: relative; z-index: 2; }
   .hero-title {
     font-size: clamp(3.2rem, 9vw, 7.5rem);
-    font-weight: 900;
-    letter-spacing: -0.045em;
-    line-height: 0.9;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.0;
     margin: 1.2rem 0;
   }
   .hero-sub {
-    color: #b9b9b4; font-size: clamp(1rem, 1.6vw, 1.2rem); max-width: 34rem;
-    font-weight: 450; letter-spacing: -0.01em;
+    color: #c9c9c2; font-size: clamp(1rem, 1.6vw, 1.2rem); max-width: 34rem;
+    font-weight: 450; letter-spacing: -0.005em;
   }
   .hero-stats {
     border-top: 1px solid #2a2a2a; margin-top: 2.5rem; padding-top: 1.5rem;
     .stat-num {
-      font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em;
+      font-size: 1.9rem; font-weight: 800; letter-spacing: -0.01em;
       color: #fff; text-shadow: none;
     }
     .stat-lbl { color: #8f8f8f; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .22em; }
@@ -238,7 +242,7 @@ a { text-underline-offset: 3px; }
       display: flex; align-items: center; justify-content: center;
       transition: background-color .15s ease, color .15s ease;
     }
-    h5 { margin-top: 1rem; font-weight: 800; letter-spacing: -0.02em; }
+    h5 { margin-top: 1rem; font-weight: 750; letter-spacing: -0.01em; }
     p { color: $ink-muted; font-size: .8rem; }
     &:hover .node-dot { background: #000; color: #fff; }
   }
@@ -246,14 +250,14 @@ a { text-underline-offset: 3px; }
 // ── Stat strip / metric tiles ────────────────────────────────
 .stat-card {
   .stat-icon { width: 40px; height: 40px; border: $border-width solid #000; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; }
-  .stat-num { font-size: 2.1rem; font-weight: 850; letter-spacing: -0.04em; line-height: 1; }
+  .stat-num { font-size: 2.1rem; font-weight: 750; letter-spacing: -0.01em; line-height: 1; }
   .stat-lbl { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: $ink-muted; }
   .spark-wrap { display: flex; align-items: flex-end; justify-content: flex-end; }
 }
 .backlit-tile {
   background: #000; color: #fff; border: 1px solid #3a3a3a; border-radius: $border-radius;
   position: relative; overflow: hidden;
-  .tile-num { font-size: clamp(2.2rem, 4vw, 3rem); font-weight: 850; letter-spacing: -0.045em; line-height: 1; }
+  .tile-num { font-size: clamp(2.2rem, 4vw, 3rem); font-weight: 750; letter-spacing: -0.01em; line-height: 1.05; }
   .tile-lbl { color: #8f8f8f; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
   .tile-glow { position: absolute; width: 120px; height: 120px; border-radius: 50%; right: -40px; top: -40px;
     background: radial-gradient(circle at center, rgba(255,255,255,.14), transparent 70%); pointer-events: none; }
@@ -264,7 +268,7 @@ a { text-underline-offset: 3px; }
   position: relative; display: inline-flex; align-items: center; justify-content: center;
   .gauge-num {
     position: absolute; font-size: clamp(2.4rem, 5vw, 3.6rem);
-    font-weight: 850; letter-spacing: -0.05em; line-height: 1;
+    font-weight: 750; letter-spacing: -0.01em; line-height: 1.05;
   }
 }
 .gauge-track { stroke: #e5e5e1; fill: none; }
@@ -382,11 +386,48 @@ a { text-underline-offset: 3px; }
   }
 }
 
-// ── Principle banner ─────────────────────────────────────────
-.principle-bar {
-  border-left: 4px solid $electric-green; background: #f7f7f5; border-radius: 10px;
-  padding: 0.9rem 1.2rem; font-size: 0.82rem; font-weight: 600;
-  strong { letter-spacing: 0.02em; }
+// ── Principle flashcards (landing) ────────────────────────────
+.flash-card {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-start; height: 100%;
+  border: $border-width solid #000; border-radius: 10px;
+  background: #fff; color: #000;
+  padding: 1.5rem 1.35rem 1.4rem;
+  overflow: hidden;
+  transition: transform .18s ease;
+  &:hover { transform: translateY(-4px); }
+
+  // Ghost step number (top-right watermark)
+  &::before {
+    content: attr(data-n);
+    position: absolute; right: .9rem; top: .85rem;
+    font-family: $font-family-monospace; font-size: 1.1rem; font-weight: 700;
+    line-height: 1; color: rgba(0,0,0,.22);
+  }
+  .flash-tag {
+    font-size: .6rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+    color: $ink-muted; margin-bottom: .85rem;
+  }
+  .flash-icon {
+    width: 46px; height: 46px; border: $border-width solid #000; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #000; margin-bottom: .85rem;
+  }
+  .flash-title { font-size: 1.25rem; font-weight: 750; letter-spacing: -0.01em; line-height: 1.1; margin-bottom: .4rem; }
+  .flash-copy { font-size: .86rem; line-height: 1.45; color: $ink-muted; margin: 0; flex-grow: 1; }
+}
+.flash-card.is-dark {
+  background: #000; color: #fff; border-color: #000;
+  .flash-tag { color: #8f8f8f; }
+  .flash-icon { border-color: #fff; color: #fff; }
+  .flash-copy { color: #c9c9c2; }
+  &::before { color: rgba(255,255,255,.2); }
+}
+// Word-by-word reveal
+.aw-wrap { display: inline; }
+.aw-word {
+  display: inline-block; white-space: pre; will-change: transform, opacity, filter;
+  margin-right: 0.28em;
 }
 
 // ── Chart polish (admin, on black) ───────────────────────────

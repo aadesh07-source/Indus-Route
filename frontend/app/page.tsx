@@ -50,6 +50,54 @@ const process = [
   { icon: FileCheck2, title: "Approve", copy: "Officer decides within SLA; system never auto-decides." },
 ];
 
+const principles = [
+  {
+    icon: ShieldCheck,
+    tag:"Rule 01",
+    title:"Rules decide.",
+    copy:"AI only explains, extracts, flags, drafts and summarizes — it never decides.",
+  },
+  {
+    icon: Workflow,
+    tag:"Engine 02",
+    title:"Deterministic by design.",
+    copy:"Applicable approvals come from a deterministic rule engine — zero guesses, zero I/O.",
+  },
+  {
+    icon: Gauge,
+    tag:"Score 03",
+    title:"Readiness is a rubric.",
+    copy:"A completeness score — never a risk score or an approval probability.",
+  },
+  {
+    icon: BellRing,
+    tag:"Green Channel 04",
+    title:"Provisional only.",
+    copy:"Issues provisional clearance, always paired with a mandatory post-facto audit.",
+  },
+];
+
+// Word-by-word scroll reveal for headings / hero copy.
+
+function AnimatedWords({ text, delay =  0, stagger =  0.06 }: { text: string; delay?: number; stagger?: number }) {
+  const words = text.split(" ");
+   return (
+    <span className="aw-wrap">
+      {words.map((w,i) => (
+        <motion.span
+          key={i}
+          className="aw-word"
+          initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
+          whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={{ duration: 0.45, delay: delay + i * stagger, ease: "easeOut" }}
+        >
+          {w}
+        </motion.span>
+      ))}
+    </span>
+  );
+}
 function scrollReveal(i: number) {
   return {
     initial: { opacity: 0, y: 20 },
@@ -148,13 +196,39 @@ export default function Landing() {
       {/* ── PRINCIPLE ──────────────────────────────────────────── */}
       <section className="py-5" style={{ background: "#fff" }}>
         <Container fluid="xxl" className="py-4">
-          <motion.div {...scrollReveal(0)} className="principle-bar">
-            <strong>Rules decide. AI explains, extracts, flags, drafts, summarizes.</strong>{" "}
-            Applicable approvals come from a deterministic rule engine. The readiness
-            score is a rubric — never a risk score. The Green Channel issues{" "}
-            <em>provisional</em> clearance only, always paired with a mandatory
-            post-facto audit.
+          <motion.div {...scrollReveal(0)} className="text-center mb-4">
+            <span className="kicker justify-content-center">How this system behaves</span>
+            <h2 className="display-7 mt-2">Built on principles, not probability.</h2>
           </motion.div>
+          <Row className="g-4">
+            {principles.map((f, i) => (
+              <Col md={6} lg={3} key={f.tag}>
+                <motion.div
+                  className="h-100"
+                  initial={{ opacity: 0, y:  40, rotateY:  10 }}
+                  whileInView={{ opacity:  1, y:  0, rotateY:  0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration:  0.5, delay: i *  0.1, ease: "easeOut" }}
+                >
+<motion.div
+                    className="h-100"
+                    animate={{ y: [0, -7, 0] }}
+                    transition={{ duration: 4.5 + i * 0.7, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <div
+                      className={"flash-card h-100" + (i === 0 || i === 2 ? " is-dark" : "")}
+                      data-n={i + 1}
+                    >
+                      <div className="flash-tag">{f.tag}</div>
+                      <div className="flash-icon"><f.icon size={26} strokeWidth={1.4} /></div>
+                      <h3 className="flash-title">{f.title}</h3>
+                      <p className="flash-copy">{f.copy}</p>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              </Col>
+            ))}
+          </Row>
         </Container>
       </section>
 
@@ -202,7 +276,9 @@ export default function Landing() {
         <Container fluid="xxl">
           <motion.div {...scrollReveal(0)} className="text-center mb-5">
             <span className="kicker justify-content-center">The journey</span>
-            <h2 className="display-6 mt-2">Five steps. Zero dead ends.</h2>
+            <h2 className="display-6 mt-2">
+                <AnimatedWords text="Five steps. Zero dead ends." delay={0.12} />
+              </h2>
           </motion.div>
           <div className="timeline d-none d-md-block">
             <div className="timeline-track">
@@ -260,9 +336,9 @@ export default function Landing() {
         <Container fluid="xxl" className="py-5 text-center">
           <motion.div {...scrollReveal(0)}>
             <BellRing size={22} strokeWidth={1.5} style={{ marginBottom: 10 }} />
-            <h2 className="display-6 text-white" style={{ maxWidth: 720, margin: "0 auto" }}>
-              Your approvals, coordinated. Your SLA, guaranteed. Your paperwork, done once.
-            </h2>
+<h2 className="display-6 text-white" style={{ maxWidth: 720, margin: "0 auto" }}>
+                <AnimatedWords text="Your approvals, coordinated. Your SLA, guaranteed. Your paperwork, done once." delay={0.05} stagger={0.04} />
+              </h2>
             <Link href="/applicant" className="btn btn-mono btn-light-invert mt-4">
               Start your journey <ArrowRight size={15} strokeWidth={2.6} />
             </Link>

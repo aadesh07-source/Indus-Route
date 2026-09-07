@@ -11,10 +11,10 @@ $black:          #000000;
 $electric-green: #000000;  // legacy hook — now pure black (was #39ff14)
 $pure-red:       #ff3b30;
 $amber:          #ff9f0a;
-$ink-muted:      #6d6d6d;   // secondary text on white (editorial grey)
-$ink-faint:      #8f8f8f;   // tertiary / placeholders
+$ink-muted:      #595959;   // secondary text on white (editorial grey) — kept dark for legibility
+$ink-faint:      #767676;   // tertiary / placeholders
 $paper:          #f6f6f4;   // print-tone panel, not a pastel
-$ink-on-dark:    #c9c9c4;   // secondary text on black
+$ink-on-dark:    #c9c9c2;   // secondary text on black
 
 // ── Bootstrap variable overrides ─────────────────────────────
 $body-bg:        $white;
@@ -46,10 +46,13 @@ $box-shadow-lg:    none;
 $box-shadow-inset: none;
 
 // ── Type ────────────────────────────────────────────────────
-$font-family-sans-serif: "Inter", "Neue Montreal", "Helvetica Neue",
-                         "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
-$font-family-monospace:  "JetBrains Mono", "SF Mono", "Cascadia Mono",
-                         Consolas, "Liberation Mono", monospace;
+// Fonts are resolved to universally-available system families so
+// glyphs always render crisply (no dependence on missing webfonts,
+// which can otherwise fall back to broken/blocky rendering).
+$font-family-sans-serif: system-ui, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, sans-serif;
+$font-family-monospace:  Consolas, "Menlo", "SF Mono",
+                         "Cascadia Mono", "Liberation Mono", monospace;
 $font-size-base:    1rem;
 $font-size-lg:      1.125rem;
 $font-weight-light: 300;
@@ -57,7 +60,10 @@ $font-weight-normal: 450;
 $font-weight-medium: 550;
 $font-weight-semibold: 650;
 $font-weight-bold:  700;
-$font-weight-bolder: 850;
+// Cap $bolder at 800: Windows has no 850/900 outlines for core
+// fonts, so the browser synthesises them — the result is a heavy
+// "block" look that reads like a black bar over the letters.
+$font-weight-bolder: 800;
 $headings-font-weight: $font-weight-bolder;
 $headings-line-height: 0.98;
 $headings-margin-bottom: 0.6rem;
