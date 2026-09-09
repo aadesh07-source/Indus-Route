@@ -379,7 +379,7 @@ def decision(application_id: str, body: DecisionRequest,
         if profile:
             notify(profile["owner_id"], "Clarification Requested",
                    final_text[:300], application_id=application_id,
-                   sms_body="Clarification requested on application {}. Check portal."
+                   sms_body="INDUS ROUTE: Clarification requested on application #{}. Check portal."
                    .format(application_id[-8:]))
         return {"clarification_id": rid, "status": "clarification_pending",
                 "ai_separation": {"ai_drafted_text": body.notes or "",
@@ -400,8 +400,9 @@ def decision(application_id: str, body: DecisionRequest,
         if profile:
             notify(profile["owner_id"], "Application Returned for Corrections",
                    body.notes.strip()[:300], application_id=application_id,
-                   sms_body="Application {} returned for corrections.".format(
-                       application_id[-8:]))
+                   sms_body="INDUS ROUTE: Your form for application #{} is resubmitted "
+                   "to you. Kindly fill up with the parameters required: {}".format(
+                       application_id[-8:], body.notes.strip()[:160]))
         return {"status": "returned", "decision_source": "human"}
 
     # Approve / Reject — ALWAYS officer-initiated (FR-18).
@@ -440,11 +441,18 @@ def decision(application_id: str, body: DecisionRequest,
         final_row = _app_or_404(application_id)
         sanction_letter = _issue_sanction_letter(final_row, user["id"])
     if profile:
-        notify(profile["owner_id"],
-               "Application {}".format(new_status.replace("_", " ").title()),
-               body.notes or "Decision recorded.", application_id=application_id,
-               sms_body="Application {} status: {}.".format(
-                   application_id[-8:], new_status.replace("_", " ")))
+        if new_status == "approved":
+            notify(profile["owner_id"], "Application Approved",
+                   body.notes or "Decision recorded.", application_id=application_id,
+                   sms_body="INDUS ROUTE: Your form for application #{} gets verified "
+                   "and got sanctioned. Download your sanction letter from the portal.".format(
+                       application_id[-8:]))
+        else:
+            notify(profile["owner_id"],
+                   "Application {}".format(new_status.replace("_", " ").title()),
+                   body.notes or "Decision recorded.", application_id=application_id,
+                   sms_body="INDUS ROUTE: Application #{} status: {}.".format(
+                       application_id[-8:], new_status.replace("_", " ")))
     result = {"status": new_status, "decision_source": "human"}
     if body.action == "approve" and sanction_letter:
         result["sanction_letter"] = sanction_letter
@@ -516,7 +524,8 @@ def _issue_sanction_letter(app_row: dict, officer_id: str,
                "Your sanctioned clearance letter is ready — download it from "
                "your Application panel.",
                application_id=app_row["id"],
-               sms_body="Sanction letter issued. Download from your portal.")
+               sms_body="INDUS ROUTE: Your sanctioned clearance letter {} is ready. "
+               "Download it from your Application panel.".format(cert_no))
     return {"certificate_id": cert_id, "certificate_no": cert_no,
             "certificate_type": certificate_type}
 

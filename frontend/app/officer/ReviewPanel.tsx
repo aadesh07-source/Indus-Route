@@ -137,20 +137,20 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
             <p style={{ fontSize: ".82rem", color: "#c9c9c4" }}>{prescrutiny.ai_summary?.text}</p>
             <div className="principle-bar mt-2"><strong>Not a verdict</strong> — officer decides.</div>
           </Card.Body></Card>
-          <Card style={{ background: "#111", borderColor: "#333" }} className="mb-3"><Card.Body>
-            <h5 className="fw-bold mb-2">Document checks</h5>
+          <Card style={{ background: "#111", color: "#eaeae6", borderColor: "#333" }} className="mb-3"><Card.Body>
+            <h5 className="fw-bold mb-2" style={{ color: "#f2f2ef" }}>Document checks</h5>
             {prescrutiny.deterministic_data?.documents?.map((d: any) => (
               <div key={d.id} className="d-flex justify-content-between py-1" style={{ borderBottom: "1px solid #333", fontSize: ".78rem" }}>
-                <span>{d.label || d.type}</span>
+                <span style={{ color: "#eaeae6" }}>{d.label || d.type}</span>
                 <span className={`mono fw-bold ${d.checks_passed === d.checks_total ? "text-success" : "text-danger"}`}>{d.checks_passed}/{d.checks_total}</span>
               </div>
             ))}
           </Card.Body></Card>
         </>)}
         {prescrutiny?.one_click && (
-          <Card style={{ background: "#111", borderColor: prescrutiny.one_click.all_signed ? "#0a0" : "#333" }} className="mb-3"><Card.Body>
+          <Card style={{ background: "#111", color: "#eaeae6", borderColor: prescrutiny.one_click.all_signed ? "#0a0" : "#333" }} className="mb-3"><Card.Body>
             <div className="d-flex justify-content-between align-items-center">
-              <h5 className="fw-bold mb-0">Clearance parameters</h5>
+              <h5 className="fw-bold mb-0" style={{ color: "#f2f2ef" }}>Clearance parameters</h5>
               <span style={{ fontSize: ".78rem" }}>
                 {prescrutiny.one_click.all_signed
                   ? <span className="text-success fw-bold">ALL APPROVED ✓</span>
@@ -165,7 +165,7 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
               <div key={p.param_key} className="py-2" style={{ borderBottom: "1px solid #222", fontSize: ".78rem" }}>
                 <div className="d-flex justify-content-between align-items-start gap-2">
                   <div>
-                    <div className="fw-bold">{p.label}</div>
+                    <div className="fw-bold" style={{ color: "#eaeae6" }}>{p.label}</div>
                     <div style={{ color: "#8f8f8f", fontSize: ".72rem", marginTop: 2 }}>{p.analysis}</div>
                   </div>
                   {p.signed ? (
@@ -186,7 +186,7 @@ export default function OfficerReviewPanel({ selected, onClose, onReload, onMsg,
                 </div>
               </div>
             ))}
-            <div className="principle-bar mt-2"><strong>Rules decided readiness ({prescrutiny.one_click.readiness_100 ? "100/100" : "incomplete"})</strong> — every green parameter needs your individual sign-off.</div>
+            <div className="principle-bar mt-2" style={{ color: "#eaeae6" }}><strong style={{ color: "#f2f2ef" }}>Rules decided readiness ({prescrutiny.one_click.readiness_100 ? "100/100" : "incomplete"})</strong> — every green parameter needs your individual sign-off.</div>
             {prescrutiny.one_click.all_signed ? (
               <Button className="btn-mono w-100 mt-2" style={{ background: "#0a0", borderColor: "#0a0", color: "#000" }}
                 onClick={() => act("approve")}>

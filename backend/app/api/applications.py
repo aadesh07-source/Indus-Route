@@ -223,13 +223,17 @@ def _perform_submit(app_row: dict, user: dict, source: str) -> dict:
 
     # Green Channel extension: deterministic auto-issuance attempt.
     gc = green_channel.attempt_green_channel(dict(app_row), approval, documents)
+    app_short = app_row["id"].replace("-", "")[-8:]
 
     if gc["issued"]:
         notify(profile["owner_id"], "Application Provisionally Cleared",
                gc["certificate"]["certificate_no"] +
                " issued. Post-facto audit is mandatory.",
                application_id=app_row["id"],
-               sms_body="Provisional permit issued - subject to audit.")
+               sms_body=("INDUS ROUTE: PROVISIONAL CLEARANCE for {} (#{}) — permit {} "
+                         "issued. Post-facto audit mandatory."
+                         .format(approval["name"], app_short,
+                                 gc["certificate"]["certificate_no"])))
     else:
         db.execute(
             "UPDATE applications SET status='submitted', submitted_at=?, "
@@ -243,7 +247,10 @@ def _perform_submit(app_row: dict, user: dict, source: str) -> dict:
                        app_row["id"], approval["name"]), application_id=app_row["id"])
         notify(profile["owner_id"], "Application Submitted",
                "Your application is in the officer queue. SLA deadline: {}".format(
-                   deadline[:10]), application_id=app_row["id"])
+                   deadline[:10]), application_id=app_row["id"],
+               sms_body=("INDUS ROUTE: Your application for {} (#{}) is submitted "
+                         "successfully and approval awaits from officer."
+                         .format(approval["name"], app_short)))
 
     audit("application", app_row["id"], user, "submit",
           "Submitted via {}. Readiness {}%. Green channel: {}".format(

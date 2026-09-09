@@ -25,6 +25,10 @@ export default function Navbar({ dark = false }: Props) {
     { href: "/admin", label: "Admin" },
   ];
 
+  const ROLE_LABEL: Record<string, string> = {
+    applicant: "Applicant", officer: "Officer", admin: "Admin", consultant: "Consultant",
+  };
+
   function signOut() {
     logout();
     setUser(null);
@@ -54,7 +58,7 @@ export default function Navbar({ dark = false }: Props) {
               <NavDropdown
                 title={
                   <span className="d-inline-flex align-items-center gap-2 text-uppercase">
-                    <User size={14} strokeWidth={1.75} /> {user.role}
+                    <User size={14} strokeWidth={1.75} /> {ROLE_LABEL[user.role] ?? user.role}
                   </span>
                 }
                 id="user-menu"

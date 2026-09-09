@@ -55,10 +55,16 @@ def start_consent(user: dict, aadhaar_number: str) -> dict:
          "digilocker-sandbox" if sandbox_mode() else "digilocker-apisetu",
          now))
     masked = "XXXX XXXX {}".format(digits[-4:])
-    from ..notifications.sms_gateway import queue_sms
-    queue_sms("DigiLocker consent OTP for IndusRoute e-KYC: {}. Valid {} min. "
-              "Never share this OTP.".format(otp, OTP_TTL_MINUTES),
-              user_id=user["id"])
+    from ..notifications.whatsapp_gateway import queue_whatsapp
+    _otp_phone = ""
+    try:
+        _urow = db.query_one("SELECT phone FROM users WHERE id=?", (user["id"],))
+        _otp_phone = (_urow.get("phone", "") if _urow else "") or ""
+    except Exception:
+        _otp_phone = ""
+    queue_whatsapp("Your INDUS ROUTE DigiLocker e-KYC OTP is {}. Valid {} min. "
+                   "Never share this OTP.".format(otp, OTP_TTL_MINUTES),
+                   user_id=user["id"], phone=_otp_phone)
     return {
         "consent_id": consent_id,
         "aadhaar_masked": masked,

@@ -101,6 +101,11 @@ class DigiLockerApplyRequest(BaseModel):
     authorized_person: str = Field(default="", max_length=120)
 
 
+class DigiLockerFetchRequest(BaseModel):
+    application_id: str = Field(min_length=4, max_length=64)
+    doc_types: list[str] = Field(min_length=1, max_length=8)
+
+
 class SignParameterRequest(BaseModel):
     param_key: str = Field(min_length=1, max_length=80)
     note: str = Field(default="", max_length=500)
@@ -108,3 +113,8 @@ class SignParameterRequest(BaseModel):
 
 class CertificateRequest(BaseModel):
     certificate_type: str = Field(default="sanction_clearance", max_length=60)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    session_id: Optional[str] = Field(default=None, max_length=80)

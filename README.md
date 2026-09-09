@@ -51,6 +51,79 @@ npm run dev
 Open <http://localhost:3000>. API calls are proxied to the backend via a
 Next.js rewrite (`/api/* -> http://127.0.0.1:8000/*`).
 
+### WhatsApp delivery (Twilio sandbox, INDUS ROUTE branded)
+
+The app sends branded WhatsApp notifications via Twilio's "Try it out WhatsApp"
+sandbox — **no paid SMS gateway, no Termux relay, no Twilio phone number
+purchase required**. Every message is prefixed with the brand name so the
+recipient sees:
+
+```
+INDUS ROUTE: Your application has been SUBMITTED SUCCESSFULLY.
+Approval awaits from the officer.
+
+INDUS ROUTE: Your application has been VERIFIED and SANCTIONED.
+Clearance granted — you may proceed.
+
+INDUS ROUTE: Your application was SENT BACK. Kindly fill up with the
+parameters required and resubmit.
+
+INDUS ROUTE: Your OTP is 123456 . Valid 10 min. Never share this OTP.
+```
+
+#### Sandbox setup (one-time, 2 minutes)
+
+1. From your **registered WhatsApp phone**, text
+   `join <your-sandbox-code>` to the Twilio sandbox number. Your trial
+   account's sandbox number is shown in Twilio Console > Messaging > Try
+   out WhatsApp. (Re-join any time the 24-hour window expires.)
+
+2. In that same Console page, note the **approved template SIDs** (the
+   `HX...` IDs) for each template:
+   - **Verification Codes** → maps to OTP messages
+   - **Appointment Reminders** → maps to status / sanction messages
+   - **Order Notifications** → maps to submitted / sent-back messages
+
+3. Paste those SIDs into `backend\.env`:
+   ```
+   TWILIO_CONTENT_SID_OTP=<Verification Codes SID>
+   TWILIO_CONTENT_SID_SUBMITTED=<Appointment Reminders SID>
+   TWILIO_CONTENT_SID_SANCTIONED=<Appointment Reminders SID>
+   TWILIO_CONTENT_SID_SENTBACK=<Order Notifications SID>
+   TWILIO_CONTENT_SID_GENERIC=<any of the above as a fallback>
+   ```
+
+   Leave a specific one blank to fall back to the generic template.
+
+4. Restart the backend (`restart_backend.bat`). The `/health` endpoint then
+   reports `templates_configured` showing which SIDs are active.
+
+#### Why template SIDs are required
+
+On a Twilio **trial** account, the Content API is disabled and every
+API-initiated WhatsApp send must reference an *approved template* (error
+`21654: ContentSid Required` otherwise). The sandbox ships three
+pre-approved templates (Verification Codes / Appointment Reminders / Order
+Notifications) whose SIDs are account-specific — they appear only in the
+Console UI and can't be listed via the API on a trial account.
+
+To send free-form WhatsApp messages without template SIDs, upgrade the
+Twilio account (removes the Content API restriction) or register a
+production WhatsApp Business sender.
+
+#### Outbound flows wired
+
+| Event | File | Brand prefix |
+|---|---|---|
+| OTP sent | `app/core/digilocker.py` | INDUS ROUTE |
+| Application submitted | `app/api/applications.py` (`sms_body`) | INDUS ROUTE |
+| Officer verifies/sanctions | `app/api/officer.py` (`sms_body`) | INDUS ROUTE |
+| Officer sends back | `app/api/officer.py` (`sms_body`) | INDUS ROUTE |
+
+All flows route through `app/notifications/whatsapp_gateway.py` → Twilio
+WhatsApp, falling back to the `sms_outbox` log table when a recipient
+phone is unknown.
+
 ### End-to-end verification
 
 ```powershell

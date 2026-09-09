@@ -16,7 +16,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 from .. import db, config
-from ..notifications.sms_gateway import queue_sms
+from ..notifications.whatsapp_gateway import queue_whatsapp
 
 
 def green_channel_enabled() -> bool:
@@ -144,7 +144,7 @@ def _issue(application: dict, approval: dict) -> dict:
          "system", db.jdumps({"application_id": application["id"],
                               "approval": approval.get("code")}), now.isoformat()))
 
-    # 4. Notify + SMS (no PII in SMS body).
+    # 4. Notify + WhatsApp (no PII in WhatsApp body).
     owner = db.query_one(
         "SELECT b.owner_id, u.phone FROM business_profiles b JOIN users u "
         "ON b.owner_id=u.id WHERE b.id=?", (application["business_id"],))
@@ -152,11 +152,11 @@ def _issue(application: dict, approval: dict) -> dict:
         db.execute(
             "INSERT INTO notifications (id, user_id, application_id, channel, title, body, "
             "status, created_at) VALUES (?,?,?,?,?,?, 'sent', ?)",
-            (db.new_id("ntf"), owner["owner_id"], application["id"], "in_app+sms",
+            (db.new_id("ntf"), owner["owner_id"], application["id"], "in_app+whatsapp",
              "Provisional Clearance Issued",
              "Provisional permit {} issued — subject to mandatory audit scheduled {}."
              .format(cert_no, audit_date), now.isoformat()))
-        queue_sms("Provisional permit issued — subject to audit. Cert: {}. Verify: {}".format(
+        queue_whatsapp("Provisional permit issued — subject to audit. Cert: {}. Verify: {}".format(
             cert_no, certificate["qr_payload"][:60]),
             user_id=owner["owner_id"], application_id=application["id"],
             phone=owner.get("phone", ""))

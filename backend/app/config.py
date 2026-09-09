@@ -12,7 +12,10 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 def _load_dotenv() -> None:
     """Load backend/.env if present (KEY=VALUE lines, # comments).
 
-    Never raises; real environment variables always take precedence.
+    Never raises. The .env file is the source of truth for the app — it
+    overwrites any inherited shell env vars of the same name so that
+    `backend/.env` always wins (prevents stale OS env from a prior
+    restart_backend.bat run from shadowing the configured values).
     """
     try:
         env_file = BACKEND_ROOT / ".env"
@@ -26,7 +29,7 @@ def _load_dotenv() -> None:
             key = key.strip()
             value = value.strip().strip('"').strip("'")
             if key:
-                os.environ.setdefault(key, value)
+                os.environ[key] = value
     except Exception:
         pass
 
@@ -81,9 +84,30 @@ GEMINI_TIMEOUT_SECONDS: int = _env("GEMINI_TIMEOUT_SECONDS", 15, int)
 DIGILOCKER_CLIENT_ID: str = _env("SIH_DIGILOCKER_CLIENT_ID", "")
 DIGILOCKER_CLIENT_SECRET: str = _env("SIH_DIGILOCKER_CLIENT_SECRET", "")
 
-# --- SMS gateway (optional) ---
-SMS_WEBHOOK_URL: str = _env("SIH_SMS_WEBHOOK_URL", "")
-SMS_WEBHOOK_TOKEN: str = _env("SIH_SMS_WEBHOOK_TOKEN", "")
+# --- Twilio WhatsApp (WhatsApp-only; no SMS / no Termux / no sandbox code) ---
+TWILIO_ACCOUNT_SID: str = _env("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN: str = _env("TWILIO_AUTH_TOKEN", "")
+TWILIO_API_KEY_SID: str = _env("TWILIO_API_KEY_SID", "")
+TWILIO_API_KEY_SECRET: str = _env("TWILIO_API_KEY_SECRET", "")
+TWILIO_WHATSAPP_FROM: str = _env("TWILIO_WHATSAPP_FROM", "")
+TWILIO_WHATSAPP_TO: str = _env("TWILIO_WHATSAPP_TO", "")
+# Registered phone number (the test/recipient device) — used for diagnostics
+# and as an explicit recipient when no in-app phone is available.
+TWILIO_FROM_NUMBER: str = _env("TWILIO_FROM_NUMBER", "")
+# Sandbox join code (Try it out WhatsApp) — text "join <code>" to the sender
+# from your phone to (re)open the 24h window / re-join the sandbox.
+TWILIO_SANDBOX_CODE: str = _env("TWILIO_SANDBOX_CODE", "")
+TWILIO_CONTENT_SID_GENERIC: str = _env("TWILIO_CONTENT_SID_GENERIC", "")
+TWILIO_CONTENT_SID_OTP: str = _env("TWILIO_CONTENT_SID_OTP", "")
+TWILIO_CONTENT_SID_SUBMITTED: str = _env("TWILIO_CONTENT_SID_SUBMITTED", "")
+TWILIO_CONTENT_SID_SANCTIONED: str = _env("TWILIO_CONTENT_SID_SANCTIONED", "")
+TWILIO_CONTENT_SID_SENTBACK: str = _env("TWILIO_CONTENT_SID_SENTBACK", "")
+
+# --- Twilio Verify (for OTP via WhatsApp/SMS) ---
+# If set, send_test_otp() uses the Verify API (managed template, no ContentSid
+# the user needs to supply). Leave blank to fall back to the Messaging API + a
+# sandbox/approved template SID (TWILIO_CONTENT_SID_OTP).
+TWILIO_VERIFY_SERVICE_SID: str = _env("TWILIO_VERIFY_SERVICE_SID", "")
 
 # --- CORS ---
 CORS_ORIGINS: list = [

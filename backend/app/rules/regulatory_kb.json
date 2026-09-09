@@ -1,0 +1,128 @@
+{
+  "_meta": {
+    "note": "Demo statutory knowledge base for the IndusRoute assistant, compiled from publicly available central and Maharashtra state legislation. Advisory only — applicants must verify with the issuing department.",
+    "version": "1.0"
+  },
+  "documents": [
+    {
+      "id": "kb_mpcb_cte",
+      "title": "MPCB Consent to Establish (CTE)",
+      "source": "Water (Prevention and Control of Pollution) Act, 1974 — Sections 25/26; Maharashtra Pollution Control Board",
+      "text": "Before beginning any construction or installation of an industrial plant in Maharashtra, the promoter must obtain Consent to Establish from the Maharashtra Pollution Control Board under Section 25 of the Water Act, 1974 (read with the Air Act, 1981). The application requires the plot/lease document, project report with production capacity, and process flow details. CTE is category-dependent (Red/Orange/Green) and typically carries a 30-day SLA. Operations may not commence, and CTO cannot be applied for, until CTE is granted."
+    },
+    {
+      "id": "kb_mpcb_cto",
+      "title": "MPCB Consent to Operate (CTO)",
+      "source": "Water Act, 1974 — Section 25/26; Air (Prevention and Control of Pollution) Act, 1981 — Section 21",
+      "text": "After commissioning the plant with a valid CTE, the unit must obtain Consent to Operate before starting commercial production. The CTO application includes effluent/emission details, stack and ETP specifications, and a compliance report against CTE conditions. CTO is issued for a limited validity period (commonly 1 to 5 years by category) and must be renewed before expiry. Operating without a valid CTO attracts closure and prosecution under Sections 41/43 of the Water Act."
+    },
+    {
+      "id": "kb_hwm_2016",
+      "title": "Hazardous and Other Wastes Rules, 2016",
+      "source": "Environment (Protection) Act, 1986 — Hazardous and Other Wastes (Management and Transboundary Movement) Rules, 2016",
+      "text": "Units generating hazardous waste (solvents, spent catalysts, contaminated drums, e-waste, biomedical waste) must obtain authorisation from MPCB under the HOWM Rules, 2016, maintain a waste inventory in Form 3, and dispose only through authorised recyclers or TSDF facilities. Annual returns in Form 4 are mandatory. Applicability depends on the waste streams listed in Schedule I of the rules."
+    },
+    {
+      "id": "kb_eia_2006",
+      "title": "EIA Notification — Category A/B classification",
+      "source": "MoEF&CC Environmental Impact Assessment Notification, 2006 (as amended)",
+      "text": "Industrial projects listed in the EIA Notification 2006 Schedule require prior Environmental Clearance. Category A projects are appraised by the MoEF&CC Expert Appraisal Committee; Category B by the State Environment Impact Assessment Authority (SEIAA). Category B1 requires a full EIA report and public consultation; B2 requires only appraisal of the application. Expansion beyond listed thresholds triggers fresh appraisal. Contact the State Environment Department to confirm the B1/B2 categorisation of the project."
+    },
+    {
+      "id": "kb_water_cess",
+      "title": "Water Cess on industrial water use",
+      "source": "Water (Prevention and Control of Pollution) Cess Act, 1977",
+      "text": "Industrial units drawing water for processing, cooling or pollution-control purposes are liable to pay water cess at rates varying by the purpose of use under the 1977 Cess Act. Meters must be installed where required, and returns filed per the prescribed schedule. Rebates on cess are available to units that install effluent treatment plants meeting MPCB standards."
+    },
+    {
+      "id": "kb_factories_plan",
+      "title": "Factory plan approval and licence (DISH)",
+      "source": "Factories Act, 1948 — Sections 6 and 7; Maharashtra Factories Rules, 1963",
+      "text": "Plans and specifications of factory buildings and machinery layout must be approved by the Directorate of Industrial Safety and Health (DISH) before construction under Section 6 of the Factories Act, 1948. After construction, a licence to work the factory is obtained (Form 2 in Maharashtra) and renewed periodically. The licence is capacity- and worker-count-dependent; occupier registration under Section 7 is mandatory. Employing workers before licensing is an offence."
+    },
+    {
+      "id": "kb_fire_noc",
+      "title": "Fire No-Objection Certificate (NOC)",
+      "source": "Maharashtra Fire Prevention and Life Safety Measures Act, 2006",
+      "text": "Buildings above the prescribed height/area and all hazardous-occupancy industries must obtain a Fire NOC from the Directorate of Maharashtra Fire Services. A provisional NOC may be issued based on plans before construction; a final NOC requires inspection of fire-fighting systems (hydrants, sprinklers, alarms per UDCPR/NBC norms). Renewal is periodic for hazardous occupancies, with six-monthly self-compliance certificates for certain occupancies."
+    },
+    {
+      "id": "kb_midc_plot",
+      "title": "MIDC plot allotment, lease and transfer",
+      "source": "Maharashtra Industrial Development Act, 1961 and MIDC (Allotment, Management and Transfer of Plots) Regulations",
+      "text": "In MIDC industrial areas, land is allotted on a 99-year lease. Construction must begin within the time allowed in the allotment order, and the built structure must conform to MIDC's sanctioned building plan. Transfer/assignment of the plot requires MIDC's prior permission and payment of transfer charges. Implementation Schedule compliance (construction milestones) is monitored; breaches can lead to allotment cancellation."
+    },
+    {
+      "id": "kb_fssai_license",
+      "title": "FSSAI licence/registration tiers",
+      "source": "Food Safety and Standards Act, 2006; FSS (Licensing and Registration of Food Businesses) Regulations, 2011",
+      "text": "Food businesses register under FSSAI at three tiers: Basic Registration (petty food businesses, turnover up to Rs 12 lakh annually, Form A); State Licence (turnover above Rs 12 lakh, medium manufacturers, storage, transport — Form B); Central Licence (importers, 100% EOUs, operations in multiple states). The licence must display the FSSAI logo and 14-digit licence number on products. Licences are valid 1-5 years and renewal must be filed before expiry to avoid a late fee and deemed lapse of the licence."
+    },
+    {
+      "id": "kb_drugs_license",
+      "title": "Drug manufacturing licence",
+      "source": "Drugs and Cosmetics Act, 1940 and Rules, 1945 — Schedule M; State FDA (Maharashtra)",
+      "text": "Manufacture of drugs requires a licence on Form 25/26 from the State Licensing Authority (Maharashtra FDA) with premises compliant with Schedule M (Good Manufacturing Practices), competent technical staff (registered pharmacist or qualified technical person), and product-wise approvals. A loan licence (Form 28) applies where the applicant uses another facility. Inspection precedes grant; ongoing compliance includes records under Rule 51 and recall procedures."
+    },
+    {
+      "id": "kb_boiler_ibr",
+      "title": "Boiler registration (IBR)",
+      "source": "Boilers Act, 1923; Indian Boiler Regulations, 1950",
+      "text": "Steam boilers must be registered with the Boiler Inspectorate under the Boilers Act, 1923 before use, and each boiler receives a certificate of fitness renewed annually. Erection and modifications require IBR-approved drawings and inspection by a competent authority. Operating an unregistered or uncertified boiler is punishable, and insurance claims may fail without valid certification."
+    },
+    {
+      "id": "kb_shops_est",
+      "title": "Shops and Establishments registration",
+      "source": "Maharashtra Shops and Establishments (Regulation of Employment and Conditions of Service) Act, 2017",
+      "text": "Every commercial establishment in Maharashtra must register with the Labour Department within 60 days of commencing work. Registration is worker-count dependent (intimation for fewer than 10 workers; certificate of registration for 10 or more). Working hours, overtime, leave and wage-payment conditions are regulated; changes such as name, address or employer must be intimated."
+    },
+    {
+      "id": "kb_contract_labour",
+      "title": "Contract labour registration and licensing",
+      "source": "Contract Labour (Regulation and Abolition) Act, 1970",
+      "text": "Establishments employing 20 or more contract workers must register as principal employers (Form 1), and every contractor employing 20 or more workers needs a licence (Form II) with security deposit. Principal employers remain responsible for wage payment and welfare compliance if the contractor defaults. Wage registers, muster rolls and annual returns must be maintained and produced at inspection."
+    },
+    {
+      "id": "kb_epf_esi",
+      "title": "EPF and ESI coverage",
+      "source": "Employees' Provident Funds and Miscellaneous Provisions Act, 1952; Employees' State Insurance Act, 1948",
+      "text": "EPF applies to establishments with 20 or more employees: employer and employee each contribute 12% of basic wages, and registration is required once the establishment reaches coverage. ESI applies where 10 or more employees are present (as notified) with gross wages up to the notified ceiling, contributing employer ~3.25% and employee 0.75%. Delayed registration attracts damages and interest under the respective Acts."
+    },
+    {
+      "id": "kb_electricity_duty",
+      "title": "Electricity connection and duty",
+      "source": "Electricity Act, 2003; Maharashtra Electricity Duty Act, 1958",
+      "text": "Industrial power is obtained from MSEDCL (or a licensed distributor) by filing a load application with the sanctioned building plan, industrial registration and test reports for the installation. The Maharashtra Electricity Duty Act, 1958 levies duty on energy consumed, collected through the bill. Load enhancement requires a fresh application; captive generation above notified thresholds has separate intimation duties."
+    },
+    {
+      "id": "kb_gst_registration",
+      "title": "GST registration and PAN linkage",
+      "source": "Central Goods and Services Tax Act, 2017; Maharashtra State Goods and Services Tax Act, 2017",
+      "text": "Businesses supplying goods above the threshold turnover or engaged in inter-state supply, e-commerce or casual taxable activity must register in GST (Form REG-01). The GSTIN embeds the entity PAN; mismatched PAN or entity names are a common cause of application rejection. The registration certificate must be displayed at the principal place of business, and returns (GSTR-1/3B) are due monthly or quarterly under the QRMP scheme."
+    },
+    {
+      "id": "kb_prof_tax",
+      "title": "Profession Tax registration",
+      "source": "Maharashtra State Tax on Professions, Trades, Callings and Employments Act, 1975",
+      "text": "Employers with one or more employees drawing taxable salary must obtain a Profession Tax Registration Certificate (PTRC) and deduct profession tax from employees' wages per the slab (capped at Rs 200 per month per employee). The company must also enrol itself (PTEC). Monthly or annual returns depend on the liability slab; late payment attracts interest and penalty under the 1975 Act."
+    },
+    {
+      "id": "kb_petroleum_storage",
+      "title": "Petroleum and flammable material storage licence",
+      "source": "Petroleum Act, 1934 and Petroleum Rules, 2002; PESO",
+      "text": "Storage of petroleum (Class A/B/C), diesel above notified quantities, or flammable compressed gases requires a storage licence from the Chief Controller of Explosives (PESO) and/or the District Collector. Licensing covers the site plan, safety distances, tank specifications and fire-protection measures. Any change in quantity or location requires licence amendment; storage without licence or beyond quantity limits is a cognisable offence."
+    },
+    {
+      "id": "kb_udcpr_building",
+      "title": "Building plan approval and occupancy certificate",
+      "source": "Unified Development Control and Promotion Regulations (UDCPR), 2020; Maharashtra Regional and Town Planning Act, 1966",
+      "text": "Industrial building plans must be sanctioned by the planning authority (MIDC in MIDC areas, municipal corporation elsewhere) under UDCPR 2020. After plinth-level and completion inspections, a Commencement Certificate (for construction) and Occupancy Certificate (for use) are issued. Carrying on industrial activity in a building without an Occupancy Certificate attracts penalties and disconnection of utilities. FSI, setback and fire-norms compliance is verified at the sanction stage."
+    },
+    {
+      "id": "kb_ewaste_batteries",
+      "title": "E-waste and battery waste management",
+      "source": "E-Waste (Management) Rules, 2022; Battery Waste Management Rules, 2022",
+      "text": "Manufacturers, producers and bulk consumers of electrical/electronic equipment and batteries must register on the CPCB EPR portal, fulfil extended producer responsibility targets through authorised recyclers, and file annual/quarterly returns. Bulk consumers must store, channelise and maintain records of waste battery and e-waste streams; transfer only to registered recyclers or refurbishers is lawful."
+    }
+  ]
+}

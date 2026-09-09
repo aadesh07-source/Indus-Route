@@ -75,22 +75,23 @@ export function VerticalBars({ data, height = 220, color = "#000000" }: {
   );
 }
 
-export function HorizontalBars({ data, height = 220 }: {
+export function HorizontalBars({ data, height = 220, labelWidth = 150 }: {
   data: { name: string; value: number }[];
   height?: number;
+  labelWidth?: number;
 }) {
   if (!data?.length) return <div style={{ height }} />;
   return (
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 20, left: 8, bottom: 0 }}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 20, left: 4, bottom: 0 }}>
           <CartesianGrid horizontal={false} stroke="#ecece8" strokeDasharray="2 4" />
           <XAxis type="number" axisLine={false} tickLine={false} allowDecimals={false}
             tick={{ fill: "#6d6d6d", fontSize: 10, fontFamily: "monospace" }} />
-          <YAxis type="category" dataKey="name" width={130} axisLine={false} tickLine={false}
-            tick={{ fill: "#000", fontSize: 10.5 }} />
+          <YAxis type="category" dataKey="name" width={labelWidth} axisLine={false} tickLine={false}
+            tick={{ fill: "#000", fontSize: 10.5, width: labelWidth - 16 }} />
           <Tooltip content={<InkTip />} cursor={{ fill: "rgba(0,0,0,.04)" }} />
-          <Bar dataKey="value" fill="#000000" radius={[0, 5, 5, 0]} barSize={14} />
+          <Bar dataKey="value" fill="#000000" radius={[0, 5, 5, 0]} barSize={15} />
         </BarChart>
       </ResponsiveContainer>
     </div>

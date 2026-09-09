@@ -18,10 +18,10 @@ from fastapi.exceptions import RequestValidationError
 
 from . import config, db
 from .api import auth, profiles, applications, documents, officer, admin, webhooks
-from .api import autofill
-from .core import scheduler
+from .api import autofill, assistant
+from .core import regulatory_kb, scheduler
 from .core.pii import pii_status
-from .notifications.sms_gateway import gateway_status
+from .notifications.whatsapp_gateway import gateway_status
 
 _version_info = {"app": "SIH26130 Platform", "version": "1.0.0"}
 
@@ -90,12 +90,15 @@ def create_app() -> FastAPI:
     app.include_router(officer.router)
     app.include_router(admin.router)
     app.include_router(webhooks.router)
+    app.include_router(assistant.router)
 
     @app.on_event("startup")
     def on_startup() -> None:
         db.init_db()
         scheduler.start_scheduler()
-        print("[SIH26130] Backend started. DB: {}".format(config.DB_PATH))
+        kb = regulatory_kb.seed()
+        print("[SIH26130] Backend started. DB: {} | Vector KB: {}".format(
+            config.DB_PATH, kb))
 
     @app.on_event("shutdown")
     def on_shutdown() -> None:
@@ -109,10 +112,11 @@ def create_app() -> FastAPI:
             "scheduler": "running",
             "ai_layer": "gemini" if config.GEMINI_API_KEY else
                         "deterministic-fallback (no GEMINI_API_KEY)",
-            "sms_gateway": gateway_status(),
+            "whatsapp_gateway": gateway_status(),
             "pii_protection": pii_status(),
             "green_channel_enabled": _gc(),
             "demo_mode": config.DEMO_MODE,
+            "vector_kb": regulatory_kb.status(),
         }
 
     def _gc():

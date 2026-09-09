@@ -248,6 +248,18 @@ CREATE TABLE IF NOT EXISTS notifications (
     sent_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS sms_outbox (
+    id TEXT PRIMARY KEY,
+    user_id TEXT DEFAULT '',
+    application_id TEXT DEFAULT '',
+    phone TEXT NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    sent_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS kyc_consents (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -325,10 +337,22 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user','assistant')),
+    content TEXT NOT NULL,
+    intent TEXT DEFAULT '',
+    citations TEXT DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_apps_business ON applications(business_id);
 CREATE INDEX IF NOT EXISTS idx_apps_status ON applications(status);
 CREATE INDEX IF NOT EXISTS idx_docs_app ON documents(application_id);
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(user_id, session_id, created_at);
 """
 
 
@@ -343,7 +367,7 @@ def _seed_settings() -> None:
 DEMO_INDUSTRIES = [
     {
         "id": "usr_app_foods", "demo_id": "PUNE-FOODS-001",
-        "name": "Pune Foods Pvt Ltd", "phone": "9000000001",
+        "name": "Pune Foods Pvt Ltd", "phone": "9326166814",
         "email": "punefoods@demo.in", "password": "Foods@2026", "sector": "food_processing",
         "industry_label": "Food Processing",
         "company": "Pune Foods Pvt Ltd",

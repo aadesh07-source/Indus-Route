@@ -108,6 +108,7 @@ a { text-underline-offset: 3px; }
 }
 
 // ── Black surface mode — intentional layout contrast ─────────
+.text-on-dark { color: #fff !important; }   // explicit escape hatch for dark fills
 .surface-black {
   --bs-body-color: #fff;
   --bs-secondary-color: #c9c9c4;
@@ -117,6 +118,8 @@ a { text-underline-offset: 3px; }
   .kicker { color: #8f8f8f; }
   // Never let text disappear into the black panel — force white.
   .text-black { color: #fff !important; }
+  .text-dark { color: #fff !important; }
+  .badge { color: #fff; }
   .text-muted, .muted { color: #8f8f8f !important; }
   .card, .card-header, .card-footer {
     background: #000;

@@ -85,7 +85,7 @@ def audit(entity_type: str, entity_id: str, actor: dict, action: str,
 
 def notify(user_id: str, title: str, body: str, application_id: str = "",
            channel: str = "in_app", sms_body: str = "") -> None:
-    from ..notifications.sms_gateway import queue_sms
+    from ..notifications.whatsapp_gateway import queue_whatsapp
 
     try:
         db.execute(
@@ -95,6 +95,11 @@ def notify(user_id: str, title: str, body: str, application_id: str = "",
              db._now()),
         )
         if sms_body:
-            queue_sms(sms_body, user_id=user_id, application_id=application_id)
+            phone = ""
+            urow = db.query_one("SELECT phone FROM users WHERE id=?", (user_id,))
+            if urow:
+                phone = urow["phone"] or ""
+            queue_whatsapp(sms_body, user_id=user_id, application_id=application_id,
+                           phone=phone)
     except Exception:
         pass

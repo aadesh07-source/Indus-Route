@@ -93,6 +93,72 @@ export const api = {
     request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
 };
 
+// ── AI Assistant chat (real-time, streaming SSE) ─────────────
+export type ChatMsg = {
+  role: "user" | "assistant";
+  content: string;
+  intent?: string;
+  citations?: any[];
+};
+
+const CHAT_SESSION_KEY = "sih26130_chat_session";
+
+export function getChatSession(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(CHAT_SESSION_KEY);
+}
+
+export function setChatSession(id: string | null) {
+  if (typeof window === "undefined") return;
+  if (id) window.localStorage.setItem(CHAT_SESSION_KEY, id);
+  else window.localStorage.removeItem(CHAT_SESSION_KEY);
+}
+
+export function assistantHistory(sessionId: string) {
+  return api.get<{ session_id: string; messages: ChatMsg[] }>(
+    `/assistant/history?session_id=${encodeURIComponent(sessionId)}`);
+}
+
+/** Streams the assistant reply via SSE; calls onDelta per token chunk. */
+export async function assistantStream(
+  message: string,
+  sessionId: string | null,
+  onDelta: (text: string) => void,
+  onDone: (meta: any) => void,
+): Promise<void> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const res = await fetch("/api/assistant/stream", {
+    method: "POST", headers,
+    body: JSON.stringify({ message, session_id: sessionId }),
+  });
+  if (!res.ok || !res.body) {
+    let detail = `Assistant unavailable (${res.status})`;
+    try { const j = await res.json(); if (j?.detail) detail = j.detail; } catch { /* noop */ }
+    throw new Error(detail);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const events = buf.split("\n\n");
+    buf = events.pop() || "";
+    for (const ev of events) {
+      const line = ev.trim();
+      if (!line.startsWith("data:")) continue;
+      try {
+        const payload = JSON.parse(line.slice(5).trim());
+        if (payload.delta) onDelta(payload.delta);
+        if (payload.done) onDone(payload);
+      } catch { /* ignore malformed chunk */ }
+    }
+  }
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 export function doLogin(identifier: string, password: string) {
   return api.post<{ token: string; user: User }>("/auth/login", { identifier, password });
@@ -229,6 +295,26 @@ export function digiLockerStatus() {
   return api.get<{ kyc_verified: boolean; identity?: any }>("/digilocker/status");
 }
 
+// ── DigiLocker Issued-Document fetch (Documents Required picker) ──
+export function getFetchableDocs(applicationId: string) {
+  return api.get<{
+    application_id: string; mode: string; kyc_verified: boolean;
+    docs: { type: string; label: string; status: string; checks_passed: number;
+      checks_total: number; digilocker_issued: boolean; issuer: string | null;
+      consent_uri: string | null; manual_fallback: boolean }[];
+    note: string;
+  }>(`/digilocker/fetchable?application_id=${applicationId}`);
+}
+export function fetchDigiLockerDocs(payload: { application_id: string; doc_types: string[] }) {
+  return api.post<{
+    status: string; mode: string; docs_registered: number;
+    fetched: { type: string; label: string; issuer: string; ocr_source: string;
+      summary: { checks_passed: number; checks_total: number; all_passed: boolean } }[];
+    skipped: { type: string; reason: string }[];
+    still_pending: string[];
+  }>("/digilocker/fetch-documents", payload);
+}
+
 // ── Unified auto-generated application form (PDF) ─────────────
 export function generateForm(applicationId: string) {
   return api.post<{ form_id: string; filename: string; verification_code: string; sha256: string; kyc_bound: boolean; size_bytes: number }>(
@@ -239,12 +325,7 @@ export function submitWithForm(applicationId: string) {
     `/applications/${applicationId}/submit-form`);
 }
 export async function downloadFormPdf(applicationId: string) {
-  const token = getToken();
-  const res = await fetch(`/api/applications/${applicationId}/form.pdf`,
-    { headers: token ? { Authorization: "Bearer " + token } : {} });
-  if (!res.ok) throw new Error("Form not available yet");
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
+  const url = await formPdfBlobUrl(applicationId);
   const a = document.createElement("a");
   a.href = url;
   a.download = `IndusRoute-Application-Form-${applicationId.slice(-8)}.pdf`;
@@ -252,6 +333,15 @@ export async function downloadFormPdf(applicationId: string) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+export async function formPdfBlobUrl(applicationId: string): Promise<string> {
+  const token = getToken();
+  const res = await fetch(`/api/applications/${applicationId}/form.pdf`,
+    { headers: token ? { Authorization: "Bearer " + token } : {} });
+  if (!res.ok) throw new Error("Form not available yet — click Fill Form (AI) first.");
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 export function updateSelectedSchemes(applicationId: string, schemeIds: string[]) {

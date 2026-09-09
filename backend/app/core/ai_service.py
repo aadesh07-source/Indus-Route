@@ -211,3 +211,57 @@ def pre_scrutiny_summary(application: dict, documents: list) -> dict:
                 "ai_generated": False}
 
 
+def _call_gemini_stream(prompt: str, system_hint: str = ""):
+    """Yield text chunks from Gemini's SSE streaming endpoint.
+
+    Retries once on transient failures (free-tier 503 model overload) as long
+    as nothing has been yielded yet. Raises on persistent failure — the caller
+    MUST fall back to deterministic text.
+    """
+    import time
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "{}:streamGenerateContent?alt=sse&key={}".format(
+            config.GEMINI_MODEL, config.GEMINI_API_KEY)
+    )
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 700},
+    }
+    if system_hint:
+        body["systemInstruction"] = {"parts": [{"text": system_hint}]}
+
+    attempts = 2
+    for attempt in range(attempts):
+        yielded = False
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(
+                    request, timeout=config.GEMINI_TIMEOUT_SECONDS) as resp:
+                for raw in resp:
+                    line = raw.decode("utf-8", errors="replace").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    try:
+                        payload = json.loads(line[5:].strip())
+                    except ValueError:
+                        continue
+                    for candidate in payload.get("candidates") or []:
+                        for part in (candidate.get("content", {}).get("parts") or []):
+                            text = part.get("text")
+                            if text:
+                                yielded = True
+                                yield text
+            return
+        except Exception:
+            if yielded or attempt >= attempts - 1:
+                raise
+            time.sleep(1.5)  # transient 503/timeout — retry once
+
+

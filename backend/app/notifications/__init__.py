@@ -1,1 +1,1 @@
-"""Notification service package (Termux SMS gateway + in-app records)."""
+"""Notification service package (Twilio WhatsApp + in-app records)."""

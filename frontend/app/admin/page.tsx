@@ -129,7 +129,7 @@ export default function AdminDashboard() {
           <div className="chart-card h-100">
             <span className="kicker">Bottlenecks</span>
             <h6 className="mt-1">Load by department</h6>
-            <HorizontalBars data={bottleneckBars} height={210} />
+            <HorizontalBars data={bottleneckBars} height={250} labelWidth={185} />
             <div className="chart-note">Where applications pile up the most.</div>
           </div>
         </Col>

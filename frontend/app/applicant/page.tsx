@@ -1,22 +1,24 @@
 // @ts-nocheck
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Container, Row, Col, Card, Button, Form, ListGroup, Badge, ProgressBar, Alert } from "react-bootstrap";
+import { Container, Row, Col, Card, Button, Form, ListGroup, Badge, ProgressBar, Alert, Modal } from "react-bootstrap";
 import Link from "next/link";
 import { motion } from "motion/react";
 import {
   FileCheck2, RefreshCw, Sparkles, Send, CheckCircle2, Clock,
   Workflow, ScrollText, Inbox, PlusCircle, Upload,
   FileDown, BadgeCheck, Zap, Fingerprint,
-  Shield, ArrowRight, AlertTriangle, FileText, Download,
+  Shield, ArrowRight, AlertTriangle, FileText, Download, Eye,
+  Lock, FolderUp, ExternalLink,
 } from "lucide-react";
 import {
   getToken, setToken, getMyProfile, saveProfile,
   listApplications, createApplication, submitApplication,
   raiseGrievance, getSchemeRecommendations, askRegulatoryQuestion, getReadiness,
   startDigiLocker, verifyDigiLocker, applyDigiLocker, digiLockerStatus,
-  generateForm, submitWithForm, downloadFormPdf, resubmitApplication,
+  generateForm, submitWithForm, downloadFormPdf, resubmitApplication, formPdfBlobUrl,
   updateSelectedSchemes, autoFillFromData, downloadCertificatePdf,
+  getFetchableDocs, fetchDigiLockerDocs,
 } from "@/lib/api";
 import NextDynamic from "next/dynamic";
 import SlaRing from "@/components/ui/SlaRing";
@@ -126,7 +128,7 @@ export default function ApplicantPortal() {
           Step 4 · Documents Required
         </span>
         <ArrowRight size={14} className="align-self-center" />
-        <span className="badge border text-dark" style={{ background: "#000", color: "#fff" }}>
+        <span className="badge border text-white" style={{ background: "#000" }}>
           Step 5 · Application
         </span>
       </div>
@@ -154,7 +156,7 @@ export default function ApplicantPortal() {
         />
       )}
       {tab === "Documents Required" && (
-        <DocumentsRequiredTab checklist={checklist} apps={apps} />
+        <DocumentsRequiredTab checklist={checklist} apps={apps} onNext={() => setTab("Application")} />
       )}
       {tab === "Application" && (
         <ApplicationsTab
@@ -250,7 +252,30 @@ function OverviewTab({ apps, checklist, avgReadiness, approved, pending, renewal
   );
 }
 
-function DocumentsRequiredTab({ checklist, apps }: { checklist: Checklist | null; apps: AppRow[] }) {
+function DocumentsRequiredTab({ checklist, apps, onNext }: { checklist: Checklist | null; apps: AppRow[]; onNext?: () => void }) {
+  const [digiMap, setDigiMap] = useState<Record<string, any>>({});
+  const [showDigi, setShowDigi] = useState(false);
+  const [digiDocs, setDigiDocs] = useState<any[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [digiMsg, setDigiMsg] = useState("");
+  const [digiErr, setDigiErr] = useState("");
+
+  const activeApp = useMemo(
+    () => apps.find((a) => a.status === "draft" || a.status === "returned") || apps[0],
+    [apps]);
+
+  const refreshStatus = useCallback(() => {
+    if (!activeApp) return;
+    getFetchableDocs(activeApp.id).then((r) => {
+      const m: Record<string, any> = {};
+      for (const d of r.docs || []) m[d.type] = d;
+      setDigiMap(m);
+    }).catch(() => {});
+  }, [activeApp && activeApp.id]);
+
+  useEffect(() => { refreshStatus(); }, [refreshStatus]);
+
   if (!checklist || !checklist.known) {
     return (
       <Card><Card.Body className="text-center py-5" style={{ color: "#6d6d6d" }}>
@@ -267,6 +292,32 @@ function DocumentsRequiredTab({ checklist, apps }: { checklist: Checklist | null
   }
   const required = Array.from(requiredSet.values());
 
+  async function openDigiLockerPortal() {
+    if (!activeApp) return;
+    setDigiMsg(""); setDigiErr(""); setPicked([]);
+    try {
+      const r = await getFetchableDocs(activeApp.id);
+      setDigiDocs((r.docs || []).filter((d) => d.digilocker_issued && d.status !== "uploaded"));
+      setShowDigi(true);
+    } catch (e: any) { setDigiErr(e.message); setShowDigi(true); }
+  }
+
+  async function allowAndFetch() {
+    if (!activeApp || picked.length === 0) return;
+    setBusy(true); setDigiErr(""); setDigiMsg("");
+    try {
+      const r = await fetchDigiLockerDocs({ application_id: activeApp.id, doc_types: picked });
+      const lines = (r.fetched || []).map((f) =>
+        `✓ ${f.label} — ${f.issuer} — ${f.summary.checks_passed}/${f.summary.checks_total} checks passed`);
+      setDigiMsg(lines.length
+        ? `DigiLocker consent granted — fetched:\n${lines.join("\n")}`
+        : "No new documents were fetched.");
+      setPicked([]);
+      refreshStatus();
+    } catch (e: any) { setDigiErr(e.message); }
+    finally { setBusy(false); }
+  }
+
   return (
     <Row className="g-3">
       <Col lg={8}>
@@ -274,9 +325,9 @@ function DocumentsRequiredTab({ checklist, apps }: { checklist: Checklist | null
           <span className="kicker">Step 4 · Documents Required</span>
           <h4 className="fw-bolder mb-1 mt-1">Personalised for your sector — {required.length} unique documents</h4>
           <p style={{ color: "#6d6d6d", fontSize: ".82rem" }}>
-            Upload each document once via the Upload Centre. The deterministic engine will
-            re-run all statutory checks (PAN/GSTIN link, OCR, regex, name similarity) on
-            every submission.
+            DigiLocker-issued documents are <strong>fetched with one consent click</strong> — digitally signed by the
+            issuing authority, no scanning needed. Everything else is uploaded manually once and reused across
+            all your applications.
           </p>
           <div className="table-modern-wrap mt-3">
             <table className="table-modern">
@@ -284,21 +335,47 @@ function DocumentsRequiredTab({ checklist, apps }: { checklist: Checklist | null
                 <tr>
                   <th>Document</th>
                   <th>Required by</th>
-                  <th className="text-end">Status</th>
+                  <th className="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {required.map((r, i) => (
-                  <tr key={r.doc}>
-                    <td><span className="fw-bold">{r.doc.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</span></td>
-                    <td className="mono" style={{ fontSize: ".72rem" }}>{r.fromApprovals.join(", ")}</td>
-                    <td className="text-end">
-                      <Badge style={{ background: "transparent", color: "#000", border: "1.5px solid #000", borderRadius: 3, fontSize: ".62rem", fontWeight: 700, letterSpacing: ".08em" }}>
-                        REQUIRED
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
+                {required.map((r) => {
+                  const st = digiMap[r.doc];
+                  const done = st && st.status === "uploaded";
+                  return (
+                    <tr key={r.doc}>
+                      <td>
+                        <span className="fw-bold">{r.doc.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</span>
+                        {st && st.digilocker_issued && !done && (
+                          <div style={{ fontSize: ".68rem", color: "#6d6d6d" }}>
+                            <Lock size={9} className="me-1" />DigiLocker Issued · {st.issuer}
+                          </div>
+                        )}
+                      </td>
+                      <td className="mono" style={{ fontSize: ".72rem" }}>{r.fromApprovals.join(", ")}</td>
+                      <td className="text-end">
+                        {done ? (
+                          <Badge style={{ background: "#000", color: "#fff", borderRadius: 3, fontSize: ".62rem", fontWeight: 700, letterSpacing: ".08em" }}>
+                            <CheckCircle2 size={10} className="me-1" />FETCHED · {st.checks_passed}/{st.checks_total} ✓
+                          </Badge>
+                        ) : st && st.digilocker_issued ? (
+                          <Button size="sm" className="btn-mono" style={{ padding: ".28rem .6rem", fontSize: ".66rem" }}
+                            onClick={openDigiLockerPortal}
+                            title="Opens your DigiLocker documents page — select the document, consent, and it is fetched with the issuer's digital signature">
+                            <Lock size={11} className="me-1" />Fetch by DigiLocker
+                          </Button>
+                        ) : (
+                          <Link href="/applicant/upload">
+                            <Button size="sm" className="btn-mono btn-outline-mono" style={{ padding: ".28rem .6rem", fontSize: ".66rem" }}
+                              title="Not available in DigiLocker — upload the scanned copy in the Upload Centre">
+                              <FolderUp size={11} className="me-1" />Upload manually
+                            </Button>
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -317,6 +394,61 @@ function DocumentsRequiredTab({ checklist, apps }: { checklist: Checklist | null
           </div>
         </Card.Body></Card>
       </Col>
+
+      <Modal show={showDigi} onHide={() => setShowDigi(false)} centered size="lg">
+        <Modal.Header closeButton style={{ borderBottom: "2px solid #000" }}>
+          <div>
+            <span className="kicker">DigiLocker · Consent-based fetch</span>
+            <h5 className="fw-bolder mb-0 mt-1">Select the documents to fetch</h5>
+          </div>
+        </Modal.Header>
+        <Modal.Body>
+          {digiErr && <Alert variant="danger" style={{ fontSize: ".8rem" }}>{digiErr}</Alert>}
+          {digiMsg && <Alert variant="success" style={{ fontSize: ".8rem", whiteSpace: "pre-line" }}>{digiMsg}</Alert>}
+          <div style={{ fontSize: ".8rem", color: "#6d6d6d" }} className="mb-2">
+            You are redirected to your DigiLocker documents page. Select the documents below and
+            consent — we receive only what you allow, verify the issuer&apos;s digital signature, and
+            run the same deterministic checks as manual uploads. Consent is revocable anytime.
+          </div>
+          <ListGroup variant="flush" style={{ border: "1px solid #e5e5e0" }}>
+            {digiDocs.length === 0 && (
+              <ListGroup.Item className="py-3" style={{ fontSize: ".8rem", color: "#6d6d6d" }}>
+                No pending DigiLocker-issued documents for this application — everything is
+                already fetched or needs manual upload.
+              </ListGroup.Item>
+            )}
+            {digiDocs.map((d: any) => (
+              <ListGroup.Item key={d.type} className="d-flex justify-content-between align-items-center py-3"
+                style={{ borderBottom: "1px solid #efefe9" }}>
+                <div className="d-flex align-items-start gap-2">
+                  <Form.Check type="checkbox" className="mt-1"
+                    checked={picked.includes(d.type)}
+                    onChange={(e: any) => setPicked((p: string[]) =>
+                      e.target.checked ? [...p, d.type] : p.filter((t: string) => t !== d.type))} />
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: ".84rem" }}>{d.label}</div>
+                    <div style={{ fontSize: ".72rem", color: "#6d6d6d" }}>
+                      Issuer: {d.issuer} · <span className="mono">{d.consent_uri}</span>
+                    </div>
+                  </div>
+                </div>
+                <Badge style={{ background: "transparent", color: "#ff9f0a", border: "1.5px solid #ff9f0a", fontSize: ".6rem", fontWeight: 700, letterSpacing: ".06em" }}>PENDING</Badge>
+              </ListGroup.Item>
+            ))}
+          </ListGroup>
+          <div className="principle-bar mt-3">
+            <strong>Sandbox note:</strong> this demo runs the DigiLocker adapter in sandbox mode —
+            the consent → select → fetch flow is identical to production (API Setu); production
+            credentials are a config swap.
+          </div>
+        </Modal.Body>
+        <Modal.Footer style={{ borderTop: "1px solid #ecece8" }}>
+          <Button size="sm" className="btn-mono btn-outline-mono" onClick={() => setShowDigi(false)}>Close</Button>
+          <Button size="sm" className="btn-mono" disabled={busy || picked.length === 0} onClick={allowAndFetch}>
+            <Lock size={13} /> {busy ? "Fetching…" : `Allow & fetch ${picked.length} document(s)`}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Row>
   );
 }
@@ -598,6 +730,19 @@ function ApplicationsTab({ apps, checklist, reload, setMsg, setErr, onPickApp }:
   const [appId, setAppId] = useState("");
   const [busyId, setBusyId] = useState("");
   const [appDetail, setAppDetail] = useState<any>(null);
+  const [viewForm, setViewForm] = useState<{ id: string; url: string } | null>(null);
+
+  async function openViewForm(id: string) {
+    setErr(""); setMsg("");
+    try {
+      const url = await formPdfBlobUrl(id);
+      setViewForm({ id, url });
+    } catch (e: any) { setErr(e.message); }
+  }
+  function closeViewForm() {
+    if (viewForm) URL.revokeObjectURL(viewForm.url);
+    setViewForm(null);
+  }
 
   async function apply(checklistApprovalId: string) {
     setErr(""); setMsg("");
@@ -720,6 +865,7 @@ function ApplicationsTab({ apps, checklist, reload, setMsg, setErr, onPickApp }:
                       onConfirmSubmit={() => confirmSubmit(a.id)}
                       onResubmit={() => resubmit(a.id)}
                       onDlForm={() => dlForm(a.id)}
+                      onViewForm={() => openViewForm(a.id)}
                       onDlCert={() => dlCert(a.id)}
                       onDetail={() => openDetail(a.id)}
                     />
@@ -738,6 +884,31 @@ function ApplicationsTab({ apps, checklist, reload, setMsg, setErr, onPickApp }:
             <ApplicationDetail detail={appDetail} />
           </Card.Body></Card>
         )}
+        <Modal show={!!viewForm} onHide={closeViewForm} centered size="xl">
+          <Modal.Header closeButton style={{ borderBottom: "2px solid #000" }}>
+            <div>
+              <span className="kicker">Unified Application Form · auto-filled by AI from DigiLocker e-KYC + profile + documents</span>
+              <h5 className="fw-bolder mb-0 mt-1">Form preview {viewForm ? `· ${viewForm.id.slice(-8)}` : ""}</h5>
+            </div>
+          </Modal.Header>
+          <Modal.Body style={{ padding: 0 }}>
+            {viewForm && (
+              <iframe src={viewForm.url} title="Unified Application Form"
+                style={{ width: "100%", height: "70vh", border: "none", background: "#f4f4f0" }} />
+            )}
+          </Modal.Body>
+          <Modal.Footer style={{ borderTop: "1px solid #ecece8" }}>
+            <span style={{ fontSize: ".7rem", color: "#6d6d6d", marginRight: "auto" }}>
+              Review every field before confirming — after submission the form is SHA-256 hashed and dispatched to the officer portal.
+            </span>
+            <Button size="sm" className="btn-mono btn-outline-mono" onClick={closeViewForm}>Close</Button>
+            {viewForm && (
+              <Button size="sm" className="btn-mono" onClick={() => downloadFormPdf(viewForm.id)}>
+                <FileDown size={13} /> Download PDF
+              </Button>
+            )}
+          </Modal.Footer>
+        </Modal>
       </Col>
       <Col lg={4}>
         <Card className="stat-card"><Card.Body>
@@ -767,7 +938,7 @@ function ApplicationsTab({ apps, checklist, reload, setMsg, setErr, onPickApp }:
   );
 }
 
-function Row1({ a, busyId, onSubmit, onGenForm, onFillForm, onConfirmSubmit, onResubmit, onDlForm, onDlCert, onDetail }: any) {
+function Row1({ a, busyId, onSubmit, onGenForm, onFillForm, onConfirmSubmit, onResubmit, onDlForm, onViewForm, onDlCert, onDetail }: any) {
   const remaining = a.sla?.remaining_hours;
   const slaColor = a.sla?.state === "breached" ? "#ff3b30" : a.sla?.state === "at_risk" ? "#ff9f0a" : "#000";
   return (
@@ -815,6 +986,11 @@ function Row1({ a, busyId, onSubmit, onGenForm, onFillForm, onConfirmSubmit, onR
                 title="AI auto-fills the form from DigiLocker KYC + selected schemes + uploaded documents — you review it first">
                 <Zap size={12} /> {busyId === a.id ? "…" : "Fill Form (AI)"}
               </Button>
+              <Button size="sm" className="btn-mono btn-outline-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }}
+                disabled={busyId === a.id} onClick={onViewForm}
+                title="Review the auto-filled Unified Application Form (PDF) before you confirm and submit">
+                <Eye size={12} /> View Form
+              </Button>
               <Button size="sm" className="btn-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem", background: "#0a0", borderColor: "#0a0", color: "#fff" }}
                 disabled={busyId === a.id} onClick={onConfirmSubmit}
                 title="Confirm the auto-filled form and dispatch it to the officer portal">
@@ -834,8 +1010,9 @@ function Row1({ a, busyId, onSubmit, onGenForm, onFillForm, onConfirmSubmit, onR
             </Button>
           )}
           {a.status !== "draft" && a.status !== "returned" && (
-            <Button size="sm" className="btn-mono btn-outline-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }} onClick={onDlForm}>
-              <FileDown size={12} /> Form PDF
+            <Button size="sm" className="btn-mono btn-outline-mono" style={{ padding: ".3rem .7rem", fontSize: ".68rem" }} onClick={onViewForm}
+              title="View the submitted Unified Application Form (PDF)">
+              <Eye size={12} /> View Form
             </Button>
           )}
           {a.status === "approved" && a.certificate && (

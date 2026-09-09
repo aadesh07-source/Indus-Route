@@ -10,7 +10,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 from .. import db
-from ..notifications.sms_gateway import queue_sms
+from ..notifications.whatsapp_gateway import queue_whatsapp
 
 _scheduler = None
 _started = False
@@ -68,8 +68,8 @@ def sla_check_job() -> None:
                          "Application {} has exceeded its SLA deadline. Escalated for priority review."
                          .format(app["id"]), _utcnow().isoformat()),
                     )
-                    queue_sms("SLA breach on application {} — escalated for priority review."
-                              .format(app["id"]), user_id=app["owner_id"], application_id=app["id"])
+                    queue_whatsapp("SLA breach on application {} — escalated for priority review."
+                               .format(app["id"]), user_id=app["owner_id"], application_id=app["id"])
                     db.execute(
                         "INSERT INTO grievances (id, application_id, user_id, reason, description, "
                         "escalation_level, status, created_at) VALUES (?,?,?,?,?,1,'open',?)",
@@ -87,8 +87,8 @@ def sla_check_job() -> None:
                          .format(app["id"], max(0, int(remaining.total_seconds() // 3600))),
                          _utcnow().isoformat()),
                     )
-                    queue_sms("Reminder: application {} is nearing its SLA deadline."
-                              .format(app["id"]), user_id=app["owner_id"], application_id=app["id"])
+                    queue_whatsapp("Reminder: application {} is nearing its SLA deadline."
+                               .format(app["id"]), user_id=app["owner_id"], application_id=app["id"])
     except Exception:
         traceback.print_exc()  # the scheduler must never take the API down
 
